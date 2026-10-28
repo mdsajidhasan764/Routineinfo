@@ -1,0 +1,17 @@
+{
+  "name": "BTEB Routine Manager",
+  "short_name": "Routine Manager",
+  "description": "Smart BTEB Diploma Class Routine & Subject Manager",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#059669",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3652/3652191.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
