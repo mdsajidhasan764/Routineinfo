@@ -23,6 +23,7 @@ import { RoutineView } from './components/RoutineView';
 import { RoutineModal } from './components/RoutineModal';
 import { BtebBooklistModal } from './components/BtebBooklistModal';
 import { ScheduleSettingsModal } from './components/ScheduleSettingsModal';
+import { ClassDetailsModal } from './components/ClassDetailsModal';
 import { DepartmentBackground } from './components/DepartmentBackground';
 import { BiometricAuthModal } from './components/BiometricAuthModal';
 import { Toast, ToastMessage } from './components/Toast';
@@ -35,7 +36,7 @@ import {
 
 export default function App() {
   const [state, setState] = useState<AppState>(() => loadAppState());
-  const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getCurrentDayName());
+  const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getCurrentDayName(loadAppState().shift));
 
   // Logged-in User Account State (Phone & Biometric)
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getCurrentUser());
@@ -68,6 +69,7 @@ export default function App() {
 
   const [btebModalOpen, setBtebModalOpen] = useState(false);
   const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [detailsRoutine, setDetailsRoutine] = useState<RoutineItem | null>(null);
 
   // Toast notifications
   const [toast, setToast] = useState<ToastMessage | null>(null);
@@ -115,6 +117,18 @@ export default function App() {
         }
       });
     }
+  }, []);
+
+  // Listen to custom in-app push notification events
+  useEffect(() => {
+    const handlePushAlert = (e: any) => {
+      const { title, body } = e.detail || {};
+      if (title) {
+        showToast(`🔔 ${title}${body ? ` (${body})` : ''}`, 'info');
+      }
+    };
+    window.addEventListener('routine_push_alert', handlePushAlert);
+    return () => window.removeEventListener('routine_push_alert', handlePushAlert);
   }, []);
 
   // Instant 1-tap Theme Switcher
@@ -185,16 +199,25 @@ export default function App() {
       const now = new Date();
       const currentDateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 
-      // Midnight Rollover Check: If date changed past 12:00 AM, automatically switch day!
+      // Midnight or Shift-End Rollover Check:
+      const targetAcademicDay = getCurrentDayName(state.shift, now);
+
       if (lastDateKeyRef.current !== currentDateKey) {
         lastDateKeyRef.current = currentDateKey;
-        const newAcademicDay = getCurrentDayName();
-        setSelectedDay(newAcademicDay);
+        setSelectedDay(targetAcademicDay);
         firedAlertsRef.current.clear();
+      } else {
+        // Automatic rollover to Next Day after Shift finishes (1:30 PM for Morning Shift, 6:30 PM for Day Shift)
+        const isDayShift = (state.shift || '').toLowerCase().includes('day') || (state.shift || '').toLowerCase().includes('2nd');
+        const cutoffMinutes = isDayShift ? 18 * 60 + 30 : 13 * 60 + 30;
+        const currentMinutesNow = now.getHours() * 60 + now.getMinutes();
+
+        if (currentMinutesNow >= cutoffMinutes && selectedDay !== targetAcademicDay) {
+          setSelectedDay(targetAcademicDay);
+        }
       }
 
-      const currentDay = getCurrentDayName();
-      const todayRoutines = state.routines.filter((r) => r.day === currentDay);
+      const todayRoutines = state.routines.filter((r) => r.day === targetAcademicDay);
 
       if (!state.notifications.enabled) return;
 
@@ -379,6 +402,7 @@ export default function App() {
           onDeleteRoutine={handleDeleteRoutine}
           searchQuery={searchQuery}
           onClearSearch={() => setSearchQuery('')}
+          onSelectRoutine={(routine) => setDetailsRoutine(routine)}
         />
       </main>
 
@@ -403,6 +427,28 @@ export default function App() {
         />
       )}
 
+      {/* Class Full In-Detail Pop-up Window */}
+      {detailsRoutine && (
+        <ClassDetailsModal
+          isOpen={!!detailsRoutine}
+          onClose={() => setDetailsRoutine(null)}
+          routine={detailsRoutine}
+          onEditRoutine={(routine) => {
+            setDetailsRoutine(null);
+            setRoutineModal({
+              isOpen: true,
+              editingRoutine: routine,
+              defaultDay: routine.day,
+              prefilledSubject: null,
+            });
+          }}
+          onDeleteRoutine={(id) => {
+            handleDeleteRoutine(id);
+            setDetailsRoutine(null);
+          }}
+        />
+      )}
+
       {/* BTEB Booklist Hub Modal */}
       {btebModalOpen && (
         <BtebBooklistModal
@@ -412,7 +458,7 @@ export default function App() {
         />
       )}
 
-      {/* Settings Modal (Appearance, Dark Mode Schedule, Institute details, Bell alerts, Backup & Clear data) */}
+      {/* Settings Modal */}
       {settingsModalOpen && (
         <ScheduleSettingsModal
           isOpen={settingsModalOpen}

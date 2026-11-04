@@ -28,13 +28,30 @@ export function normalizeDay(rawDay: string | undefined): DayOfWeek {
 }
 
 export function sanitizeRoutineItem(r: any, idx: number): RoutineItem {
+  let shift: 'Morning Shift' | 'Day Shift' = 'Morning Shift';
+  if (r.shift) {
+    const s = String(r.shift).toLowerCase();
+    if (s.includes('day') || s.includes('2nd')) {
+      shift = 'Day Shift';
+    } else {
+      shift = 'Morning Shift';
+    }
+  }
+
+  let group: 'A' | 'B' | 'C' = 'A';
+  if (r.group === 'B' || r.group === 'C') {
+    group = r.group;
+  }
+
   return {
     id: r.id || uid(`r_${idx}`),
+    shift,
+    group,
     code: (r.code || '').trim(),
     subjectName: cleanTitle((r.subjectName || r.name || 'Untitled Subject').trim()),
     day: normalizeDay(r.day),
-    startTime: (r.startTime || '09:00 AM').trim(),
-    endTime: (r.endTime || '10:30 AM').trim(),
+    startTime: (r.startTime || (shift === 'Day Shift' ? '12:30 PM' : '08:00 AM')).trim(),
+    endTime: (r.endTime || (shift === 'Day Shift' ? '02:00 PM' : '09:30 AM')).trim(),
     room: (r.room || '').trim(),
     teacherName: (r.teacherName || '').trim(),
     teacherPhone: (r.teacherPhone || '').trim(),
@@ -65,6 +82,9 @@ export function loadAppState(): AppState {
       advanceMinutes: typeof parsed.notifications?.advanceMinutes === 'number' ? parsed.notifications.advanceMinutes : 0,
     };
 
+    const rawShift = String(parsed.shift || '').toLowerCase();
+    const normalizedShift = rawShift.includes('day') || rawShift.includes('2nd') ? 'Day Shift' : 'Morning Shift';
+
     return {
       routines,
       departmentSlug: parsed.departmentSlug || INITIAL_STATE.departmentSlug,
@@ -72,7 +92,7 @@ export function loadAppState(): AppState {
       instituteName: parsed.instituteName || parsed.settings?.semesterName || '',
       departmentName: cleanTitle(parsed.departmentName || INITIAL_STATE.departmentName),
       semesterName: parsed.semesterName || '1st Semester',
-      shift: parsed.shift || '1st Shift',
+      shift: normalizedShift,
       section: parsed.section || 'A',
       notifications,
       theme: {

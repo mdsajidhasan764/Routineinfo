@@ -43,18 +43,39 @@ export function formatMinutesToTime(totalMinutes: number): string {
   return `${hours12}:${minStr} ${period}`;
 }
 
-export function getCurrentDayName(): DayOfWeek {
-  const dayIndex = new Date().getDay(); // 0 is Sunday, 1 Monday ... 5 Friday, 6 Saturday
+export function getCurrentDayName(shift: string = 'Morning Shift', now: Date = new Date()): DayOfWeek {
+  const dayIndex = now.getDay(); // 0 is Sunday, 1 Monday ... 4 Thursday, 5 Friday, 6 Saturday
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // Shift Cutoffs:
+  // Morning Shift: 08:00 AM - 01:30 PM (cutoff: 1:30 PM = 810 mins)
+  // Day Shift:     12:30 PM - 06:30 PM (cutoff: 6:30 PM = 1110 mins)
+  const isDayShift = (shift || '').toLowerCase().includes('day') || (shift || '').toLowerCase().includes('2nd');
+  const cutoffMinutes = isDayShift ? 18 * 60 + 30 : 13 * 60 + 30;
+
+  // Weekend (Friday or Saturday) always rolls over to Sunday
+  if (dayIndex === 5 || dayIndex === 6) {
+    return 'Sunday';
+  }
+
+  // If past today's shift cutoff, automatically advance to next academic day!
+  if (currentMinutes >= cutoffMinutes) {
+    if (dayIndex === 0) return 'Monday';      // Sunday evening -> Monday
+    if (dayIndex === 1) return 'Tuesday';     // Monday evening -> Tuesday
+    if (dayIndex === 2) return 'Wednesday';   // Tuesday evening -> Wednesday
+    if (dayIndex === 3) return 'Thursday';    // Wednesday evening -> Thursday
+    if (dayIndex === 4) return 'Sunday';      // Thursday evening -> Sunday (next week)
+  }
+
   const map: Record<number, DayOfWeek> = {
     0: 'Sunday',
     1: 'Monday',
     2: 'Tuesday',
     3: 'Wednesday',
     4: 'Thursday',
-    5: 'Sunday', // Weekend (Friday) defaults to next school week
-    6: 'Sunday', // Weekend (Saturday) defaults to next school week
   };
-  return map[dayIndex] ?? 'Sunday';
+
+  return map[dayIndex] || 'Sunday';
 }
 
 /**
@@ -158,9 +179,6 @@ export function isDarkModeActive(theme?: { mode: 'light' | 'dark' | 'schedule'; 
   return false;
 }
 
-/**
- * Send an offline browser/PWA native push notification with service worker and device vibration
- */
 export function triggerSystemNotification(title: string, options?: NotificationOptions): void {
   // Trigger native device vibration if available
   if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -171,12 +189,27 @@ export function triggerSystemNotification(title: string, options?: NotificationO
     }
   }
 
+  // Dispatch in-app push notification event for immediate on-screen visibility
+  if (typeof window !== 'undefined') {
+    try {
+      const event = new CustomEvent('routine_push_alert', {
+        detail: {
+          title,
+          body: (options as any)?.body || '',
+        },
+      });
+      window.dispatchEvent(event);
+    } catch {
+      // ignore
+    }
+  }
+
   if (typeof window === 'undefined' || !('Notification' in window)) return;
 
   if (Notification.permission === 'granted') {
     const nativeOptions: NotificationOptions & Record<string, any> = {
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
+      icon: '/icon.svg',
+      badge: '/icon.svg',
       silent: false,
       tag: options?.tag || 'bteb-routine-alert',
       renotify: true,
@@ -198,7 +231,6 @@ export function triggerSystemNotification(title: string, options?: NotificationO
         new Notification(title, nativeOptions);
       }
     } catch {
-      // Fallback
       try {
         new Notification(title, nativeOptions);
       } catch {

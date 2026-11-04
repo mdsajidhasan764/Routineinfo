@@ -53,8 +53,7 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 3145728, // 3MB to comfortably cache curriculum
         },
         devOptions: {
-          enabled: true,
-          type: 'module',
+          enabled: false,
         },
       }),
     ],

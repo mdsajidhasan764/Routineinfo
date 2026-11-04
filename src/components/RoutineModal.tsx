@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calendar, Clock, MapPin, User, Phone, BookOpen, Plus, Check } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, User, Phone, BookOpen, Layers, Users } from 'lucide-react';
 import { RoutineItem, DayOfWeek, DAYS_OF_WEEK } from '../types';
 import { uid, cleanTitle } from '../utils/storage';
-import { getAllDepartments, BtebDepartment, BtebSubjectItem } from '../services/btebService';
+import { getAllDepartments, BtebSubjectItem } from '../services/btebService';
 import { ClockTimePickerModal } from './ClockTimePickerModal';
 
 interface RoutineModalProps {
@@ -15,9 +15,6 @@ interface RoutineModalProps {
   defaultSemester?: number;
   prefilledSubject?: { code: string; name: string } | null;
 }
-
-const COMMON_START_TIMES = ['08:00 AM', '09:00 AM', '09:45 AM', '10:30 AM', '11:15 AM', '12:00 PM', '01:30 PM', '02:15 PM', '03:00 PM', '04:15 PM'];
-const COMMON_END_TIMES = ['09:00 AM', '09:45 AM', '10:30 AM', '11:15 AM', '12:00 PM', '01:15 PM', '02:15 PM', '03:00 PM', '04:15 PM', '05:00 PM'];
 
 export const RoutineModal: React.FC<RoutineModalProps> = ({
   isOpen,
@@ -48,11 +45,13 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
   const [semester, setSemester] = useState<number>(defaultSemester || 1);
 
   // Form Fields
+  const [shift, setShift] = useState<'Morning Shift' | 'Day Shift'>('Morning Shift');
+  const [group, setGroup] = useState<'A' | 'B' | 'C'>('A');
   const [code, setCode] = useState('');
   const [subjectName, setSubjectName] = useState('');
   const [day, setDay] = useState<DayOfWeek>(defaultDay);
-  const [startTime, setStartTime] = useState('09:00 AM');
-  const [endTime, setEndTime] = useState('10:30 AM');
+  const [startTime, setStartTime] = useState('08:00 AM');
+  const [endTime, setEndTime] = useState('09:30 AM');
   const [room, setRoom] = useState('');
   const [teacherName, setTeacherName] = useState('');
   const [teacherPhone, setTeacherPhone] = useState('');
@@ -61,30 +60,48 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
   // Clock screen time picker state
   const [clockPickerTarget, setClockPickerTarget] = useState<'start' | 'end' | null>(null);
 
-  // Prefill when editing
+  // Prefill when editing or initializing
   useEffect(() => {
     if (editingRoutine) {
+      const isDay = (editingRoutine.shift || '').toLowerCase().includes('day') || (editingRoutine.shift || '').toLowerCase().includes('2nd');
+      const normalizedShift: 'Morning Shift' | 'Day Shift' = isDay ? 'Day Shift' : 'Morning Shift';
+      setShift(normalizedShift);
+      setGroup(editingRoutine.group || 'A');
       setCode(editingRoutine.code || '');
       setSubjectName(editingRoutine.subjectName || '');
       setDay(editingRoutine.day || defaultDay);
-      setStartTime(editingRoutine.startTime || '09:00 AM');
-      setEndTime(editingRoutine.endTime || '10:30 AM');
+      setStartTime(editingRoutine.startTime || (isDay ? '12:30 PM' : '08:00 AM'));
+      setEndTime(editingRoutine.endTime || (isDay ? '02:00 PM' : '09:30 AM'));
       setRoom(editingRoutine.room || '');
       setTeacherName(editingRoutine.teacherName || '');
       setTeacherPhone(editingRoutine.teacherPhone || '');
       setNote(editingRoutine.note || '');
     } else {
+      setShift('Morning Shift');
+      setGroup('A');
       setCode(prefilledSubject?.code || '');
       setSubjectName(prefilledSubject?.name || '');
       setDay(defaultDay);
-      setStartTime('09:00 AM');
-      setEndTime('10:30 AM');
+      setStartTime('08:00 AM');
+      setEndTime('09:30 AM');
       setRoom('');
       setTeacherName('');
       setTeacherPhone('');
       setNote('');
     }
   }, [editingRoutine, defaultDay, prefilledSubject, isOpen]);
+
+  // Handle shift switch to keep times within shift range
+  const handleShiftChange = (newShift: 'Morning Shift' | 'Day Shift') => {
+    setShift(newShift);
+    if (newShift === 'Morning Shift') {
+      setStartTime('08:00 AM');
+      setEndTime('09:30 AM');
+    } else {
+      setStartTime('12:30 PM');
+      setEndTime('02:00 PM');
+    }
+  };
 
   // Find curriculum subjects for the selected department & semester
   const availableBooks = useMemo<BtebSubjectItem[]>(() => {
@@ -113,6 +130,8 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
 
     const item: RoutineItem = {
       id: editingRoutine ? editingRoutine.id : uid('class'),
+      shift,
+      group,
       code: code.trim(),
       subjectName: subjectName.trim(),
       day,
@@ -127,8 +146,6 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
     onSaveRoutine(item);
     onClose();
   };
-
-  const selectedDeptTitle = allDepartments.find((d) => d.slug === deptSlug)?.title || 'Computer Science & Technology';
 
   return (
     <>
@@ -158,14 +175,11 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 text-xs">
-            {/* Quick BTEB Book Auto-fill */}
+            {/* Auto Fill */}
             <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-emerald-900 dark:text-emerald-300">
-                <span className="flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
-                  <span>Auto-fill from BTEB Curriculum:</span>
-                </span>
-                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-normal">Optional</span>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                <BookOpen className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                <span>Auto Fill</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
@@ -205,7 +219,7 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
                   className="w-full px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 text-emerald-950 dark:text-emerald-300 focus:outline-emerald-500"
                 >
                   <option value="" disabled>
-                    {availableBooks.length > 0 ? 'Select a book to auto-fill code & name...' : 'No books in this semester'}
+                    {availableBooks.length > 0 ? 'Select a book from Auto Fill...' : 'No books in this semester'}
                   </option>
                   {availableBooks.map((b: BtebSubjectItem) => (
                     <option key={b.code} value={b.code}>
@@ -216,7 +230,7 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
               </div>
             </div>
 
-            {/* Subject Code & Subject Name */}
+            {/* Subject Code & Subject Name (Manual Input Disabled) */}
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
               <div className="sm:col-span-4">
                 <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
@@ -225,9 +239,9 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
                 <input
                   type="text"
                   value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  placeholder="28541"
-                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:outline-emerald-500"
+                  readOnly
+                  placeholder="Auto-filled"
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/60 text-slate-600 dark:text-slate-400 font-mono cursor-not-allowed select-none"
                 />
               </div>
 
@@ -238,9 +252,9 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
                 <input
                   type="text"
                   value={subjectName}
-                  onChange={(e) => setSubjectName(e.target.value)}
-                  placeholder="e.g. Computer Office Application"
-                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:outline-emerald-500"
+                  readOnly
+                  placeholder="Select a book from Auto Fill above"
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-900/60 text-slate-700 dark:text-slate-300 font-medium cursor-not-allowed select-none"
                   required
                 />
               </div>
@@ -265,49 +279,51 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
               </select>
             </div>
 
-            {/* Time Slot with Android Clock Picker Screen */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Start Time Field */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Start Time
+            {/* Time Slot with Shift Constraints */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                  Class Time Slot ({shift === 'Morning Shift' ? 'Morning' : 'DAY'})
                 </label>
-                <div
-                  onClick={() => setClockPickerTarget('start')}
-                  className="relative cursor-pointer group"
-                >
-                  <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 group-hover:scale-110 transition" />
-                  <input
-                    type="text"
-                    readOnly
-                    value={startTime}
-                    className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500 font-mono font-bold cursor-pointer hover:border-emerald-500"
-                  />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
-                    Scroll Clock ⏰
-                  </span>
-                </div>
               </div>
 
-              {/* End Time Field */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  End Time
-                </label>
-                <div
-                  onClick={() => setClockPickerTarget('end')}
-                  className="relative cursor-pointer group"
-                >
-                  <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 group-hover:scale-110 transition" />
-                  <input
-                    type="text"
-                    readOnly
-                    value={endTime}
-                    className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500 font-mono font-bold cursor-pointer hover:border-emerald-500"
-                  />
-                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
-                    Scroll Clock ⏰
-                  </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Start Time Field */}
+                <div>
+                  <div
+                    onClick={() => setClockPickerTarget('start')}
+                    className="relative cursor-pointer group"
+                  >
+                    <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 group-hover:scale-110 transition" />
+                    <input
+                      type="text"
+                      readOnly
+                      value={startTime}
+                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500 font-mono font-bold cursor-pointer hover:border-emerald-500"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
+                      Pick Time ⏰
+                    </span>
+                  </div>
+                </div>
+
+                {/* End Time Field */}
+                <div>
+                  <div
+                    onClick={() => setClockPickerTarget('end')}
+                    className="relative cursor-pointer group"
+                  >
+                    <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 group-hover:scale-110 transition" />
+                    <input
+                      type="text"
+                      readOnly
+                      value={endTime}
+                      className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500 font-mono font-bold cursor-pointer hover:border-emerald-500"
+                    />
+                    <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
+                      Pick Time ⏰
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -326,6 +342,65 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
                   placeholder="e.g. Network Lab / Room 402"
                   className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500"
                 />
+              </div>
+            </div>
+
+            {/* Shift & Group Selection - Directly Above Teacher's Name (Compact & Sleek) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Select Shift */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                  <Layers className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Select Shift</span>
+                </label>
+                <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => handleShiftChange('Morning Shift')}
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition text-center cursor-pointer ${
+                      shift === 'Morning Shift'
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Morning
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleShiftChange('Day Shift')}
+                    className={`flex-1 py-1.5 px-2 rounded-lg text-xs font-bold transition text-center cursor-pointer ${
+                      shift === 'Day Shift'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    Day
+                  </button>
+                </div>
+              </div>
+
+              {/* Select Group */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1">
+                  <Users className="w-3.5 h-3.5 text-blue-600" />
+                  <span>Select Group</span>
+                </label>
+                <div className="flex rounded-xl bg-slate-100 dark:bg-slate-800 p-1 border border-slate-200 dark:border-slate-700">
+                  {(['A', 'B', 'C'] as const).map((grp) => (
+                    <button
+                      key={grp}
+                      type="button"
+                      onClick={() => setGroup(grp)}
+                      className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition text-center cursor-pointer ${
+                        group === grp
+                          ? 'bg-blue-600 text-white shadow-xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      }`}
+                    >
+                      Group {grp}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -378,42 +453,42 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
               />
             </div>
 
-            {/* Modal Actions */}
-            <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+            {/* Action Buttons */}
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-200 dark:border-slate-800">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+                className="px-4 py-2 font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition"
+                className="px-5 py-2 font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition cursor-pointer"
               >
-                {editingRoutine ? 'Update Class' : 'Save to Routine'}
+                {editingRoutine ? 'Update Routine' : 'Save Routine'}
               </button>
             </div>
           </form>
         </div>
       </div>
 
-      {/* Android DeskClock Time Picker Screen */}
+      {/* Clock Time Picker Modal */}
       {clockPickerTarget && (
         <ClockTimePickerModal
-          isOpen={!!clockPickerTarget}
+          isOpen={true}
           onClose={() => setClockPickerTarget(null)}
-          title={clockPickerTarget === 'start' ? 'Select Start Time' : 'Select End Time'}
-          initialTime={clockPickerTarget === 'start' ? startTime : endTime}
-          departmentName={selectedDeptTitle}
-          onSelectTime={(pickedTime) => {
+          onSelectTime={(newTime) => {
             if (clockPickerTarget === 'start') {
-              setStartTime(pickedTime);
+              setStartTime(newTime);
             } else {
-              setEndTime(pickedTime);
+              setEndTime(newTime);
             }
-            setClockPickerTarget(null);
           }}
+          initialTime={clockPickerTarget === 'start' ? startTime : endTime}
+          title={clockPickerTarget === 'start' ? 'Select Start Time' : 'Select End Time'}
+          departmentName={allDepartments.find((d) => d.slug === deptSlug)?.title || 'Computer Science & Technology'}
+          shift={shift}
         />
       )}
     </>

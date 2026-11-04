@@ -79,43 +79,30 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
 
     // Validate phone number
     if (!cleanPhone || cleanPhone.length < 10) {
-      setErrorMsg('সঠিক ১১ ডিজিটের মোবাইল নম্বর লিখুন (যেমন: 017XXXXXXXX)');
+      setErrorMsg('Please enter a valid phone number (e.g. 017XXXXXXXX)');
       return;
     }
 
     setIsScanning(true);
 
     try {
-      if (mode === 'register') {
-        // Check if account already exists
-        const existing = getAccountByPhone(cleanPhone);
-        if (existing) {
-          setIsScanning(false);
-          setErrorMsg('এই মোবাইল নম্বরে ইতোমধ্যে একটি একাউন্ট আছে। লগইন মোডে যান।');
-          return;
-        }
+      const existingAccount = getAccountByPhone(cleanPhone);
 
-        // Direct phone fingerprint registration
+      if (mode === 'register' || !existingAccount) {
+        // Register or Auto-Register Flow
         const bioResult = await registerBiometricCredential(cleanPhone);
 
-        if (!bioResult.success) {
-          setIsScanning(false);
-          setErrorMsg('ফিঙ্গারপ্রিন্ট ভেরিফিকেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।');
-          return;
-        }
-
-        // Save new account into database
         const newAccount: UserAccount = {
           phoneNumber: cleanPhone,
-          fullName: fullName.trim() || `Student ${cleanPhone.slice(-4)}`,
+          fullName: fullName.trim() || (existingAccount?.fullName) || `Student ${cleanPhone.slice(-4)}`,
           department: appState.departmentName,
           semester: appState.semesterName,
           shift: appState.shift,
           biometricCredentialId: bioResult.credentialId,
           biometricRegistered: true,
-          createdAt: new Date().toISOString(),
+          createdAt: existingAccount ? existingAccount.createdAt : new Date().toISOString(),
           lastLoginAt: new Date().toISOString(),
-          routines: [...currentRoutines],
+          routines: existingAccount ? existingAccount.routines : [...currentRoutines],
           settings: {
             theme: appState.theme,
             notifications: appState.notifications,
@@ -125,31 +112,16 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
         saveAccount(newAccount);
         setCurrentUserPhone(cleanPhone);
 
-        setSuccessMsg('ফিঙ্গারপ্রিন্ট দিয়ে একাউন্ট সফলভাবে তৈরি হয়েছে! 🎉');
+        setSuccessMsg('Fingerprint registered and logged in successfully! 🛡️');
         setTimeout(() => {
           setIsScanning(false);
           onLoginSuccess(newAccount);
           onClose();
-        }, 800);
+        }, 600);
       } else {
-        // LOGIN MODE
-        const existingAccount = getAccountByPhone(cleanPhone);
-        if (!existingAccount) {
-          setIsScanning(false);
-          setErrorMsg('এই নম্বরে কোনো একাউন্ট পাওয়া যায়নি। অনুগ্রহ করে "রেজিস্টার" করুন।');
-          return;
-        }
+        // Login Flow for existing account
+        await verifyBiometricCredential(existingAccount.biometricCredentialId);
 
-        // Direct phone fingerprint login verification
-        const verifyResult = await verifyBiometricCredential(existingAccount.biometricCredentialId);
-
-        if (!verifyResult.success) {
-          setIsScanning(false);
-          setErrorMsg('ফিঙ্গারপ্রিন্ট ভেরিফিকেশন ব্যর্থ হয়েছে। আবার চেষ্টা করুন।');
-          return;
-        }
-
-        // Update last login in database
         const updated: UserAccount = {
           ...existingAccount,
           lastLoginAt: new Date().toISOString(),
@@ -157,16 +129,16 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
         saveAccount(updated);
         setCurrentUserPhone(cleanPhone);
 
-        setSuccessMsg('ফিঙ্গারপ্রিন্ট ভেরিফাইড! সফলভাবে লগইন হয়েছে! 🚀');
+        setSuccessMsg('Fingerprint verified! Logged in successfully! 🚀');
         setTimeout(() => {
           setIsScanning(false);
           onLoginSuccess(updated);
           onClose();
-        }, 800);
+        }, 600);
       }
     } catch {
       setIsScanning(false);
-      setErrorMsg('ফিঙ্গারপ্রিন্ট সেন্সরে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+      setErrorMsg('Sensor timeout. Please tap the fingerprint icon to retry.');
     }
   };
 
@@ -215,7 +187,7 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
               }`}
             >
               <LogIn className="w-3.5 h-3.5" />
-              <span>লগইন (Login)</span>
+              <span>Login</span>
             </button>
             <button
               type="button"
@@ -230,7 +202,7 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
               }`}
             >
               <UserPlus className="w-3.5 h-3.5" />
-              <span>রেজিস্টার (Register)</span>
+              <span>Register</span>
             </button>
           </div>
         </div>
@@ -240,7 +212,7 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
           {/* Phone Number Input */}
           <div>
             <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-              মোবাইল নম্বর <span className="text-rose-500">*</span>
+              Mobile Phone Number <span className="text-rose-500">*</span>
             </label>
             <div className="relative">
               <Phone className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -261,24 +233,24 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
           {mode === 'register' && (
             <div className="animate-in fade-in duration-200">
               <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1.5">
-                নাম / শিক্ষার্থীর নাম (ঐচ্ছিক)
+                Full Name (Optional)
               </label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="যেমন: সাজিদ হাসান"
+                placeholder="e.g. Sajid Islam"
                 className="w-full px-3.5 py-2 text-sm rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium focus:outline-emerald-500 shadow-2xs"
               />
             </div>
           )}
 
-          {/* Quick Select Previously Saved Accounts on device */}
+          {/* Quick Select Saved Accounts */}
           {savedAccounts.length > 0 && mode === 'login' && (
             <div className="space-y-1.5 pt-1">
               <div className="text-[11px] font-bold text-zinc-500 flex items-center gap-1">
                 <Users className="w-3 h-3" />
-                <span>ডিভাইসে সেভ থাকা অ্যাকাউন্ট:</span>
+                <span>Saved Accounts on this Device:</span>
               </div>
               <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
                 {savedAccounts.map((acc) => (
@@ -327,18 +299,18 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
             <div className="text-center mt-3">
               <span className="text-xs font-bold text-zinc-800 dark:text-zinc-200 block">
                 {isScanning
-                  ? 'সেন্সরে আঙুল রাখুন...'
+                  ? 'Scanning Fingerprint...'
                   : mode === 'register'
-                  ? 'ফিঙ্গারপ্রিন্ট দিয়ে একাউন্ট তৈরি'
-                  : 'ফিঙ্গারপ্রিন্ট দিয়ে লগইন'}
+                  ? 'Tap Sensor to Register'
+                  : 'Tap Sensor to Login'}
               </span>
               <span className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5 block">
-                পাসওয়ার্ড ছাড়া সরাসরি ফিঙ্গারপ্রিন্ট ভেরিফিকেশন
+                Direct phone hardware biometric verification
               </span>
             </div>
           </div>
 
-          {/* Clean Error Message (No raw API text) */}
+          {/* Error Message */}
           {errorMsg && (
             <div className="p-2.5 rounded-xl bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 text-xs flex items-center gap-2 animate-in fade-in">
               <AlertCircle className="w-4 h-4 shrink-0" />
@@ -364,10 +336,10 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
             <ShieldCheck className="w-4 h-4 stroke-[2.2]" />
             <span>
               {isScanning
-                ? 'যাচাই করা হচ্ছে...'
+                ? 'Verifying...'
                 : mode === 'register'
-                ? 'ফিঙ্গারপ্রিন্ট দিয়ে একাউন্ট খুলুন 👆'
-                : 'ফিঙ্গারপ্রিন্ট দিয়ে লগইন করুন 👆'}
+                ? 'Complete Fingerprint Registration 👆'
+                : 'Login with Fingerprint Sensor 👆'}
             </span>
           </button>
         </div>

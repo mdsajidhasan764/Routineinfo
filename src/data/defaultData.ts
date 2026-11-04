@@ -24,7 +24,7 @@ export const INITIAL_STATE: AppState = {
   instituteName: '',
   departmentName: '',
   semesterName: '1st Semester',
-  shift: '1st Shift',
+  shift: 'Morning Shift',
   section: 'A',
   notifications: DEFAULT_NOTIFICATIONS,
   theme: DEFAULT_THEME,

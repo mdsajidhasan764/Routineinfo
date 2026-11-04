@@ -6,13 +6,8 @@ import {
   Settings,
   Calendar,
   Smartphone,
-  Fingerprint,
-  LogOut,
-  ShieldCheck,
-  User,
 } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { UserAccount } from '../utils/authDatabase';
 
 interface LeftMenuProps {
   isOpen: boolean;
@@ -20,9 +15,9 @@ interface LeftMenuProps {
   onOpenAddClass: () => void;
   onOpenBtebHub: () => void;
   onOpenSettings: () => void;
-  currentUser: UserAccount | null;
-  onOpenAuth: (mode?: 'login' | 'register') => void;
-  onLogout: () => void;
+  currentUser?: any;
+  onOpenAuth?: (mode?: 'login' | 'register') => void;
+  onLogout?: () => void;
 }
 
 export const LeftMenu: React.FC<LeftMenuProps> = ({
@@ -31,9 +26,6 @@ export const LeftMenu: React.FC<LeftMenuProps> = ({
   onOpenAddClass,
   onOpenBtebHub,
   onOpenSettings,
-  currentUser,
-  onOpenAuth,
-  onLogout,
 }) => {
   const { isInstallable, install } = usePWAInstall();
 
@@ -76,110 +68,6 @@ export const LeftMenu: React.FC<LeftMenuProps> = ({
 
         {/* Menu Body */}
         <div className="p-4 space-y-4 flex-1 overflow-y-auto">
-          {/* USER ACCOUNT & FINGERPRINT AUTH CARD */}
-          {currentUser ? (
-            /* Logged In Profile Card */
-            <div className="bg-zinc-50 dark:bg-zinc-900/90 rounded-2xl p-3.5 border border-zinc-200/80 dark:border-zinc-800/80 space-y-2.5 shadow-2xs">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
-                    <User className="w-5 h-5" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="font-bold text-xs text-zinc-900 dark:text-white truncate">
-                      {currentUser.fullName || 'Student'}
-                    </div>
-                    <div className="font-mono text-[11px] text-zinc-500 dark:text-zinc-400 truncate">
-                      {currentUser.phoneNumber}
-                    </div>
-                  </div>
-                </div>
-
-                <div
-                  className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0"
-                  title="Biometric Fingerprint Verified"
-                >
-                  <Fingerprint className="w-4 h-4" />
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-2 border-t border-zinc-200/60 dark:border-zinc-800/60 text-[11px]">
-                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
-                  <ShieldCheck className="w-3.5 h-3.5" />
-                  <span>Biometric Verified</span>
-                </span>
-                <span className="text-zinc-400 font-medium">
-                  {currentUser.routines?.length || 0} classes
-                </span>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenAuth('login');
-                  }}
-                  className="py-1.5 px-2 text-[11px] font-semibold rounded-lg bg-zinc-200/70 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 transition text-center"
-                >
-                  Switch
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onLogout();
-                    onClose();
-                  }}
-                  className="py-1.5 px-2 text-[11px] font-semibold rounded-lg bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 hover:bg-rose-100 transition flex items-center justify-center gap-1"
-                >
-                  <LogOut className="w-3 h-3" />
-                  <span>Logout</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* Not Logged In - Biometric Login CTA */
-            <div className="bg-emerald-50/70 dark:bg-emerald-950/30 rounded-2xl p-3.5 border border-emerald-200/80 dark:border-emerald-900/60 space-y-2.5">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                  <Fingerprint className="w-5 h-5 stroke-[2.2]" />
-                </div>
-                <div className="min-w-0">
-                  <div className="font-bold text-xs text-emerald-950 dark:text-emerald-200">
-                    Fingerprint Login
-                  </div>
-                  <div className="text-[10px] text-emerald-700/80 dark:text-emerald-400">
-                    Phone & Biometric (No password)
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-1.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenAuth('login');
-                  }}
-                  className="py-2 px-2 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition text-center shadow-xs cursor-pointer flex items-center justify-center gap-1"
-                >
-                  <Fingerprint className="w-3.5 h-3.5" />
-                  <span>Login</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenAuth('register');
-                  }}
-                  className="py-2 px-2 text-xs font-bold rounded-xl bg-white dark:bg-zinc-900 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-50 transition text-center cursor-pointer"
-                >
-                  Register
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Main Action: Add Class Routine */}
           <button
             type="button"

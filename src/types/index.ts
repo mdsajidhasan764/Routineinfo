@@ -13,16 +13,20 @@ export const DAYS_OF_WEEK: DayOfWeek[] = [
   'Thursday',
 ];
 
+export type ShiftType = 'Morning Shift' | 'Day Shift' | '1st Shift' | '2nd Shift';
+
 export interface RoutineItem {
   id: string;
   code: string;
   subjectName: string;
   day: DayOfWeek;
-  startTime: string; // e.g. "09:00 AM"
-  endTime: string;   // e.g. "10:30 AM"
-  room: string;      // e.g. "Room 402"
-  teacherName: string; // e.g. "Engr. Monirul Islam"
+  startTime: string; // e.g. "08:00 AM"
+  endTime: string;   // e.g. "09:30 AM"
+  room: string;      // e.g. "Room 402" / "Network Lab"
+  teacherName: string; // e.g. "Sajid Islam"
   teacherPhone?: string; // e.g. "017XXXXXXXX"
+  shift?: ShiftType;
+  group?: 'A' | 'B' | 'C';
   color?: string;
   note?: string;
 }

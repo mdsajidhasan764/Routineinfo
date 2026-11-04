@@ -13,17 +13,19 @@ if (container) {
   );
 }
 
-// Safely register PWA Service Worker without blocking initial render
+// Safely register PWA Service Worker in production without blocking initial render
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
-  import('virtual:pwa-register')
-    .then(({ registerSW }) => {
-      try {
-        registerSW({ immediate: true });
-      } catch (e) {
-        console.warn('SW registration skipped:', e);
-      }
-    })
-    .catch((err) => {
-      console.warn('PWA module load skipped:', err);
-    });
+  if (import.meta.env.PROD) {
+    import('virtual:pwa-register')
+      .then(({ registerSW }) => {
+        try {
+          registerSW({ immediate: true });
+        } catch (e) {
+          console.warn('SW registration skipped:', e);
+        }
+      })
+      .catch((err) => {
+        console.warn('PWA module load skipped:', err);
+      });
+  }
 }

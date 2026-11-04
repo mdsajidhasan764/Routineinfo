@@ -8,6 +8,7 @@ interface ClockTimePickerModalProps {
   initialTime?: string; // e.g. "04:15 PM" or "09:00 AM"
   title?: string;
   departmentName?: string;
+  shift?: 'Morning Shift' | 'Day Shift' | '1st Shift' | '2nd Shift';
 }
 
 const ITEM_HEIGHT = 52; // Height of each number row in px
@@ -21,7 +22,10 @@ export const ClockTimePickerModal: React.FC<ClockTimePickerModalProps> = ({
   initialTime = '09:00 AM',
   title = 'Select Class Time',
   departmentName = 'Computer Science & Technology',
+  shift = 'Morning Shift',
 }) => {
+  const isMorningShift = !((shift || '').toLowerCase().includes('day') || (shift || '').toLowerCase().includes('2nd'));
+
   // Parse initial time
   const parseInitial = () => {
     try {
@@ -36,7 +40,9 @@ export const ClockTimePickerModal: React.FC<ClockTimePickerModalProps> = ({
     } catch {
       // fallback
     }
-    return { h: 9, m: 0, period: 'AM' as const };
+    return !isMorningShift
+      ? { h: 12, m: 30, period: 'PM' as const }
+      : { h: 8, m: 0, period: 'AM' as const };
   };
 
   const initial = parseInitial();
@@ -69,9 +75,10 @@ export const ClockTimePickerModal: React.FC<ClockTimePickerModalProps> = ({
     deptLower.includes('automobile') ||
     deptLower.includes('power');
 
-  const hoursList = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+  // Hours and periods based on shift (Morning: 8:00 AM - 1:30 PM, Day: 12:30 PM - 6:30 PM)
+  const hoursList = isMorningShift ? [8, 9, 10, 11, 12, 1] : [12, 1, 2, 3, 4, 5, 6];
   const minutesList = Array.from({ length: 60 }, (_, i) => i);
-  const periodsList: ('AM' | 'PM')[] = ['AM', 'PM'];
+  const periodsList: ('AM' | 'PM')[] = isMorningShift ? ['AM', 'PM'] : ['PM'];
 
   // Initialize and synchronize scrolls on open
   useEffect(() => {
@@ -220,7 +227,30 @@ export const ClockTimePickerModal: React.FC<ClockTimePickerModalProps> = ({
   };
 
   const handleConfirm = () => {
-    onSelectTime(fullTimeString);
+    let finalH = selectedHour;
+    let finalM = selectedMinute;
+    let finalPeriod = selectedPeriod;
+
+    if (isMorningShift) {
+      // Morning Shift: 08:00 AM to 01:30 PM
+      if (finalH === 12 || finalH === 1) {
+        finalPeriod = 'PM';
+      } else {
+        finalPeriod = 'AM';
+      }
+      if (finalH === 1 && finalM > 30) finalM = 30;
+      if (![8, 9, 10, 11, 12, 1].includes(finalH)) finalH = 8;
+    } else {
+      // Day Shift: 12:30 PM to 06:30 PM
+      finalPeriod = 'PM';
+      if (![12, 1, 2, 3, 4, 5, 6].includes(finalH)) finalH = 12;
+      if (finalH === 12 && finalM < 30) finalM = 30;
+      if (finalH === 6 && finalM > 30) finalM = 30;
+    }
+
+    const hStr = finalH < 10 ? `0${finalH}` : `${finalH}`;
+    const mStr = finalM < 10 ? `0${finalM}` : `${finalM}`;
+    onSelectTime(`${hStr}:${mStr} ${finalPeriod}`);
     onClose();
   };
 
