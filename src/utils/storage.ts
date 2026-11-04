@@ -20,11 +20,11 @@ export function cleanTitle(title: string): string {
 }
 
 export function normalizeDay(rawDay: string | undefined): DayOfWeek {
-  if (!rawDay) return 'Saturday';
+  if (!rawDay) return 'Sunday';
   const mapped = DAY_TRANSLATION_MAP[rawDay.trim()];
   if (mapped) return mapped;
   const match = DAYS_OF_WEEK.find((d) => d.toLowerCase() === rawDay.toLowerCase());
-  return match || 'Saturday';
+  return match || 'Sunday';
 }
 
 export function sanitizeRoutineItem(r: any, idx: number): RoutineItem {
@@ -75,6 +75,11 @@ export function loadAppState(): AppState {
       shift: parsed.shift || '1st Shift',
       section: parsed.section || 'A',
       notifications,
+      theme: {
+        mode: parsed.theme?.mode || 'light',
+        scheduleStart: parsed.theme?.scheduleStart || '19:00',
+        scheduleEnd: parsed.theme?.scheduleEnd || '06:00',
+      },
     };
   } catch (err) {
     console.error('Failed to load routine state from localStorage:', err);
@@ -135,6 +140,11 @@ export async function parseRoutineBackup(file: File): Promise<AppState> {
       notifyOnStart: parsed.notifications?.notifyOnStart ?? DEFAULT_NOTIFICATIONS.notifyOnStart,
       notifyOnEnd: parsed.notifications?.notifyOnEnd ?? DEFAULT_NOTIFICATIONS.notifyOnEnd,
       advanceMinutes: parsed.notifications?.advanceMinutes ?? 0,
+    },
+    theme: {
+      mode: parsed.theme?.mode || 'light',
+      scheduleStart: parsed.theme?.scheduleStart || '19:00',
+      scheduleEnd: parsed.theme?.scheduleEnd || '06:00',
     },
   };
 }

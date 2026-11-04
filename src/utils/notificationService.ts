@@ -44,16 +44,17 @@ export function formatMinutesToTime(totalMinutes: number): string {
 }
 
 export function getCurrentDayName(): DayOfWeek {
-  const days: DayOfWeek[] = [
-    'Sunday',
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-  ];
-  return days[new Date().getDay()];
+  const dayIndex = new Date().getDay(); // 0 is Sunday, 1 Monday ... 5 Friday, 6 Saturday
+  const map: Record<number, DayOfWeek> = {
+    0: 'Sunday',
+    1: 'Monday',
+    2: 'Tuesday',
+    3: 'Wednesday',
+    4: 'Thursday',
+    5: 'Sunday', // Weekend (Friday) defaults to next school week
+    6: 'Sunday', // Weekend (Saturday) defaults to next school week
+  };
+  return map[dayIndex] ?? 'Sunday';
 }
 
 /**
@@ -116,27 +117,92 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 }
 
 /**
- * Send an offline browser notification
+ * Builds class start notification title matching exact user template:
+ * "Computer Office Application - Start At 4:15PM - Network Lab."
+ */
+export function formatStartNotification(item: RoutineItem): string {
+  const roomPart = item.room ? ` - ${item.room}` : '';
+  return `${item.subjectName} - Start At ${item.startTime}${roomPart}.`;
+}
+
+/**
+ * Builds class end notification title matching exact user template:
+ * "Computer Office Application - Ended At 5:00PM - Network Lab."
+ */
+export function formatEndNotification(item: RoutineItem): string {
+  const roomPart = item.room ? ` - ${item.room}` : '';
+  return `${item.subjectName} - Ended At ${item.endTime}${roomPart}.`;
+}
+
+/**
+ * Evaluates whether dark mode should be enabled based on user preference or schedule
+ */
+export function isDarkModeActive(theme?: { mode: 'light' | 'dark' | 'schedule'; scheduleStart?: string; scheduleEnd?: string }): boolean {
+  if (!theme || theme.mode === 'light') return false;
+  if (theme.mode === 'dark') return true;
+  if (theme.mode === 'schedule') {
+    const now = new Date();
+    const currentMin = now.getHours() * 60 + now.getMinutes();
+    const [startH = 19, startM = 0] = (theme.scheduleStart || '19:00').split(':').map(Number);
+    const [endH = 6, endM = 0] = (theme.scheduleEnd || '06:00').split(':').map(Number);
+    const startMin = startH * 60 + startM;
+    const endMin = endH * 60 + endM;
+
+    if (startMin <= endMin) {
+      return currentMin >= startMin && currentMin < endMin;
+    } else {
+      // Over midnight: e.g. 19:00 (7 PM) to 06:00 (6 AM)
+      return currentMin >= startMin || currentMin < endMin;
+    }
+  }
+  return false;
+}
+
+/**
+ * Send an offline browser/PWA native push notification with service worker and device vibration
  */
 export function triggerSystemNotification(title: string, options?: NotificationOptions): void {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'granted') {
+  // Trigger native device vibration if available
+  if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
     try {
-      new Notification(title, {
-        icon: '/pwa-192x192.png',
-        badge: '/pwa-192x192.png',
-        silent: false,
-        ...options,
-      });
-    } catch (e) {
-      // In service worker context or restricted iframe
-      if (navigator.serviceWorker && navigator.serviceWorker.ready) {
-        navigator.serviceWorker.ready.then((registration) => {
-          registration.showNotification(title, {
-            icon: '/pwa-192x192.png',
-            ...options,
+      navigator.vibrate([200, 100, 200, 100, 350]);
+    } catch {
+      // ignore
+    }
+  }
+
+  if (typeof window === 'undefined' || !('Notification' in window)) return;
+
+  if (Notification.permission === 'granted') {
+    const nativeOptions: NotificationOptions & Record<string, any> = {
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
+      silent: false,
+      tag: options?.tag || 'bteb-routine-alert',
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [200, 100, 200, 100, 350],
+      ...options,
+    };
+
+    try {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.ready
+          .then((registration) => {
+            registration.showNotification(title, nativeOptions);
+          })
+          .catch(() => {
+            new Notification(title, nativeOptions);
           });
-        });
+      } else {
+        new Notification(title, nativeOptions);
+      }
+    } catch {
+      // Fallback
+      try {
+        new Notification(title, nativeOptions);
+      } catch {
+        // blocked by browser
       }
     }
   }

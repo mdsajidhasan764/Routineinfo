@@ -3,6 +3,7 @@ import { X, Calendar, Clock, MapPin, User, Phone, BookOpen, Plus, Check } from '
 import { RoutineItem, DayOfWeek, DAYS_OF_WEEK } from '../types';
 import { uid, cleanTitle } from '../utils/storage';
 import { getAllDepartments, BtebDepartment, BtebSubjectItem } from '../services/btebService';
+import { ClockTimePickerModal } from './ClockTimePickerModal';
 
 interface RoutineModalProps {
   isOpen: boolean;
@@ -15,15 +16,15 @@ interface RoutineModalProps {
   prefilledSubject?: { code: string; name: string } | null;
 }
 
-const COMMON_START_TIMES = ['08:00 AM', '09:00 AM', '10:30 AM', '11:15 AM', '12:00 PM', '01:30 PM', '02:15 PM', '03:00 PM'];
-const COMMON_END_TIMES = ['09:00 AM', '09:45 AM', '10:30 AM', '12:00 PM', '01:15 PM', '02:15 PM', '03:00 PM', '04:30 PM'];
+const COMMON_START_TIMES = ['08:00 AM', '09:00 AM', '09:45 AM', '10:30 AM', '11:15 AM', '12:00 PM', '01:30 PM', '02:15 PM', '03:00 PM', '04:15 PM'];
+const COMMON_END_TIMES = ['09:00 AM', '09:45 AM', '10:30 AM', '11:15 AM', '12:00 PM', '01:15 PM', '02:15 PM', '03:00 PM', '04:15 PM', '05:00 PM'];
 
 export const RoutineModal: React.FC<RoutineModalProps> = ({
   isOpen,
   onClose,
   onSaveRoutine,
   editingRoutine,
-  defaultDay = 'Saturday',
+  defaultDay = 'Sunday',
   defaultDeptSlug,
   defaultSemester = 1,
   prefilledSubject,
@@ -57,16 +58,10 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
   const [teacherPhone, setTeacherPhone] = useState('');
   const [note, setNote] = useState('');
 
-  // Active department & subjects for selected department and semester
-  const activeDept = useMemo(() => {
-    return allDepartments.find((d) => d.slug === deptSlug) || allDepartments[0];
-  }, [allDepartments, deptSlug]);
+  // Clock screen time picker state
+  const [clockPickerTarget, setClockPickerTarget] = useState<'start' | 'end' | null>(null);
 
-  const availableBooks: BtebSubjectItem[] = useMemo(() => {
-    if (!activeDept || !activeDept.semesters) return [];
-    return activeDept.semesters[String(semester)] || [];
-  }, [activeDept, semester]);
-
+  // Prefill when editing
   useEffect(() => {
     if (editingRoutine) {
       setCode(editingRoutine.code || '');
@@ -78,19 +73,9 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
       setTeacherName(editingRoutine.teacherName || '');
       setTeacherPhone(editingRoutine.teacherPhone || '');
       setNote(editingRoutine.note || '');
-    } else if (prefilledSubject) {
-      setCode(prefilledSubject.code || '');
-      setSubjectName(prefilledSubject.name || '');
-      setDay(defaultDay);
-      setStartTime('09:00 AM');
-      setEndTime('10:30 AM');
-      setRoom('');
-      setTeacherName('');
-      setTeacherPhone('');
-      setNote('');
     } else {
-      setCode('');
-      setSubjectName('');
+      setCode(prefilledSubject?.code || '');
+      setSubjectName(prefilledSubject?.name || '');
       setDay(defaultDay);
       setStartTime('09:00 AM');
       setEndTime('10:30 AM');
@@ -99,28 +84,35 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
       setTeacherPhone('');
       setNote('');
     }
-  }, [editingRoutine, prefilledSubject, defaultDay, isOpen]);
+  }, [editingRoutine, defaultDay, prefilledSubject, isOpen]);
 
-  if (!isOpen) return null;
+  // Find curriculum subjects for the selected department & semester
+  const availableBooks = useMemo<BtebSubjectItem[]>(() => {
+    const dept = allDepartments.find((d) => d.slug === deptSlug);
+    if (!dept || !dept.semesters) return [];
+    const subjects = dept.semesters[String(semester)] || dept.semesters[`semester_${semester}`];
+    return Array.isArray(subjects) ? subjects : [];
+  }, [allDepartments, deptSlug, semester]);
 
-  // Auto-fill from selected book
   const handleSelectBook = (bookCode: string) => {
-    const book = availableBooks.find((b) => b.code === bookCode);
+    const book = availableBooks.find((b: BtebSubjectItem) => b.code === bookCode);
     if (book) {
       setCode(book.code);
-      setSubjectName(book.name);
+      setSubjectName(cleanTitle(book.name));
     }
   };
+
+  if (!isOpen) return null;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!subjectName.trim()) {
-      alert('Please enter or select a subject name');
+      alert('Please enter a subject name');
       return;
     }
 
     const item: RoutineItem = {
-      id: editingRoutine?.id || uid('class'),
+      id: editingRoutine ? editingRoutine.id : uid('class'),
       code: code.trim(),
       subjectName: subjectName.trim(),
       day,
@@ -136,282 +128,294 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
     onClose();
   };
 
+  const selectedDeptTitle = allDepartments.find((d) => d.slug === deptSlug)?.title || 'Computer Science & Technology';
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
-      onClick={onClose}
-    >
+    <>
       <div
-        className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[92vh]"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs"
+        onClick={onClose}
       >
-        {/* Clean Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
-              <Calendar className="w-4 h-4" />
+        <div
+          className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-800 max-h-[92vh] flex flex-col transition-colors"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                {editingRoutine ? 'Edit Class Routine' : 'Add Class Routine'}
+              </h2>
             </div>
-            <h2 className="text-base font-bold text-slate-900">
-              {editingRoutine ? 'Edit Class Routine' : 'Add Class Routine'}
-            </h2>
+            <button
+              onClick={onClose}
+              className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-200/60 dark:hover:bg-slate-800 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
-        {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1">
-          {/* BTEB Auto-Fill Subject Picker */}
-          <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Auto-fill from BTEB Curriculum</span>
-              </span>
-              <a
-                href="https://btebresultszone.com/booklists"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[11px] text-emerald-700 hover:underline font-semibold"
-              >
-                Source: btebresultszone.com
-              </a>
-            </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+            {/* Quick BTEB Book Auto-fill */}
+            <div className="p-3 bg-emerald-50/60 dark:bg-emerald-950/40 rounded-xl border border-emerald-200 dark:border-emerald-800 space-y-2">
+              <div className="flex items-center justify-between text-xs font-bold text-emerald-900 dark:text-emerald-300">
+                <span className="flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />
+                  <span>Auto-fill from BTEB Curriculum:</span>
+                </span>
+                <span className="text-[10px] text-emerald-700 dark:text-emerald-400 font-normal">Optional</span>
+              </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-              {/* Department selector */}
-              <div className="sm:col-span-8">
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                <div className="sm:col-span-8">
+                  <select
+                    value={deptSlug}
+                    onChange={(e) => setDeptSlug(e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-emerald-500"
+                  >
+                    {allDepartments.map((d) => (
+                      <option key={d.slug} value={d.slug}>
+                        {cleanTitle(d.title)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="sm:col-span-4">
+                  <select
+                    value={semester}
+                    onChange={(e) => setSemester(Number(e.target.value))}
+                    className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-emerald-500"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                      <option key={s} value={s}>
+                        Semester {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
                 <select
-                  value={deptSlug}
-                  onChange={(e) => setDeptSlug(e.target.value)}
-                  className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-emerald-500"
+                  onChange={(e) => handleSelectBook(e.target.value)}
+                  defaultValue=""
+                  className="w-full px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg border border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-800 text-emerald-950 dark:text-emerald-300 focus:outline-emerald-500"
                 >
-                  {allDepartments.map((d) => (
-                    <option key={d.slug} value={d.slug}>
-                      {cleanTitle(d.title)}
+                  <option value="" disabled>
+                    {availableBooks.length > 0 ? 'Select a book to auto-fill code & name...' : 'No books in this semester'}
+                  </option>
+                  {availableBooks.map((b: BtebSubjectItem) => (
+                    <option key={b.code} value={b.code}>
+                      [{b.code}] {b.name} ({b.credit} Cr)
                     </option>
                   ))}
                 </select>
               </div>
+            </div>
 
-              {/* Semester selector */}
+            {/* Subject Code & Subject Name */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
               <div className="sm:col-span-4">
-                <select
-                  value={semester}
-                  onChange={(e) => setSemester(Number(e.target.value))}
-                  className="w-full px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-800 focus:outline-emerald-500"
-                >
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                    <option key={s} value={s}>
-                      Semester {s}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Subject Code
+                </label>
+                <input
+                  type="text"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  placeholder="28541"
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:outline-emerald-500"
+                />
+              </div>
+
+              <div className="sm:col-span-8">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Subject Name <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={subjectName}
+                  onChange={(e) => setSubjectName(e.target.value)}
+                  placeholder="e.g. Computer Office Application"
+                  className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:outline-emerald-500"
+                  required
+                />
               </div>
             </div>
 
-            {/* Book picker dropdown */}
+            {/* Day of Week */}
             <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Day of Week
+              </label>
               <select
-                onChange={(e) => handleSelectBook(e.target.value)}
-                defaultValue=""
-                className="w-full px-3 py-2 text-xs sm:text-sm font-semibold rounded-lg border border-emerald-300 bg-white text-emerald-950 focus:outline-emerald-500"
+                value={day}
+                onChange={(e) => setDay(e.target.value as DayOfWeek)}
+                className="w-full px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500"
+                required
               >
-                <option value="" disabled>
-                  {availableBooks.length > 0 ? 'Select a book to auto-fill code & name...' : 'No books in this semester'}
-                </option>
-                {availableBooks.map((b) => (
-                  <option key={b.code} value={b.code}>
-                    [{b.code}] {b.name} ({b.credit} Cr)
+                {DAYS_OF_WEEK.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
                   </option>
                 ))}
               </select>
             </div>
-          </div>
 
-          {/* Subject Code & Subject Name */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-3">
-            <div className="sm:col-span-4">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Subject Code
+            {/* Time Slot with Android Clock Picker Screen */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Start Time Field */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Start Time
+                </label>
+                <div
+                  onClick={() => setClockPickerTarget('start')}
+                  className="relative cursor-pointer group"
+                >
+                  <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 group-hover:scale-110 transition" />
+                  <input
+                    type="text"
+                    readOnly
+                    value={startTime}
+                    className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500 font-mono font-bold cursor-pointer hover:border-emerald-500"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
+                    Scroll Clock ⏰
+                  </span>
+                </div>
+              </div>
+
+              {/* End Time Field */}
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  End Time
+                </label>
+                <div
+                  onClick={() => setClockPickerTarget('end')}
+                  className="relative cursor-pointer group"
+                >
+                  <Clock className="w-4 h-4 text-emerald-600 dark:text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 group-hover:scale-110 transition" />
+                  <input
+                    type="text"
+                    readOnly
+                    value={endTime}
+                    className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500 font-mono font-bold cursor-pointer hover:border-emerald-500"
+                  />
+                  <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
+                    Scroll Clock ⏰
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Room / Lab */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Room / Lab Number
+              </label>
+              <div className="relative">
+                <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={room}
+                  onChange={(e) => setRoom(e.target.value)}
+                  placeholder="e.g. Network Lab / Room 402"
+                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500"
+                />
+              </div>
+            </div>
+
+            {/* Teacher Details */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Teacher's Name
+                </label>
+                <div className="relative">
+                  <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={teacherName}
+                    onChange={(e) => setTeacherName(e.target.value)}
+                    placeholder="e.g. Engr. Monirul Islam"
+                    className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Teacher's Phone
+                </label>
+                <div className="relative">
+                  <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="tel"
+                    value={teacherPhone}
+                    onChange={(e) => setTeacherPhone(e.target.value)}
+                    placeholder="017XXXXXXXX"
+                    className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-mono focus:outline-emerald-500"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Note */}
+            <div>
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                Note / Lab Instructions (Optional)
               </label>
               <input
                 type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                placeholder="28541"
-                className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white text-slate-900 font-mono focus:outline-emerald-500"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="e.g. Bring practical notebook"
+                className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500"
               />
             </div>
 
-            <div className="sm:col-span-8">
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Subject Name <span className="text-rose-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={subjectName}
-                onChange={(e) => setSubjectName(e.target.value)}
-                placeholder="e.g. Data Structures & Algorithms"
-                className="w-full px-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white text-slate-900 font-medium focus:outline-emerald-500"
-                required
-              />
+            {/* Modal Actions */}
+            <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-5 py-2 font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition"
+              >
+                {editingRoutine ? 'Update Class' : 'Save to Routine'}
+              </button>
             </div>
-          </div>
-
-          {/* Day of Week */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Day of Week <span className="text-rose-500">*</span>
-            </label>
-            <select
-              value={day}
-              onChange={(e) => setDay(e.target.value as DayOfWeek)}
-              className="w-full px-3 py-2 text-xs sm:text-sm font-semibold rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-emerald-500"
-              required
-            >
-              {DAYS_OF_WEEK.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Time Slot (Start Time & End Time) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Start Time
-              </label>
-              <div className="relative">
-                <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={startTime}
-                  onChange={(e) => setStartTime(e.target.value)}
-                  placeholder="09:00 AM"
-                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-emerald-500 font-mono"
-                />
-              </div>
-              <div className="flex gap-1 mt-1 overflow-x-auto pb-1 scrollbar-none">
-                {COMMON_START_TIMES.slice(0, 4).map((time) => (
-                  <button
-                    key={time}
-                    type="button"
-                    onClick={() => setStartTime(time)}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 shrink-0"
-                  >
-                    {time}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                End Time
-              </label>
-              <div className="relative">
-                <Clock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={endTime}
-                  onChange={(e) => setEndTime(e.target.value)}
-                  placeholder="10:30 AM"
-                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-emerald-500 font-mono"
-                />
-              </div>
-              <div className="flex gap-1 mt-1 overflow-x-auto pb-1 scrollbar-none">
-                {COMMON_END_TIMES.slice(1, 5).map((time) => (
-                  <button
-                    key={time}
-                    type="button"
-                    onClick={() => setEndTime(time)}
-                    className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-600 shrink-0"
-                  >
-                    {time}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Room / Lab */}
-          <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">
-              Room / Lab Number
-            </label>
-            <div className="relative">
-              <MapPin className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                value={room}
-                onChange={(e) => setRoom(e.target.value)}
-                placeholder="e.g. Room 402, Lab 2"
-                className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-emerald-500"
-              />
-            </div>
-          </div>
-
-          {/* Teacher Name & Phone Number */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Teacher Name
-              </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={teacherName}
-                  onChange={(e) => setTeacherName(e.target.value)}
-                  placeholder="e.g. Engr. Anisur Rahman"
-                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-emerald-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">
-                Teacher Phone (Optional)
-              </label>
-              <div className="relative">
-                <Phone className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={teacherPhone}
-                  onChange={(e) => setTeacherPhone(e.target.value)}
-                  placeholder="01712345678"
-                  className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 bg-white text-slate-900 focus:outline-emerald-500 font-mono"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="pt-3 flex items-center justify-end gap-2 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-5 py-2 text-xs sm:text-sm font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 shadow-xs transition flex items-center gap-1.5"
-            >
-              <Plus className="w-4 h-4" />
-              <span>{editingRoutine ? 'Update Class' : 'Save Class'}</span>
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+
+      {/* Android DeskClock Time Picker Screen */}
+      {clockPickerTarget && (
+        <ClockTimePickerModal
+          isOpen={!!clockPickerTarget}
+          onClose={() => setClockPickerTarget(null)}
+          title={clockPickerTarget === 'start' ? 'Select Start Time' : 'Select End Time'}
+          initialTime={clockPickerTarget === 'start' ? startTime : endTime}
+          departmentName={selectedDeptTitle}
+          onSelectTime={(pickedTime) => {
+            if (clockPickerTarget === 'start') {
+              setStartTime(pickedTime);
+            } else {
+              setEndTime(pickedTime);
+            }
+            setClockPickerTarget(null);
+          }}
+        />
+      )}
+    </>
   );
 };

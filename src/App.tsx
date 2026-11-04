@@ -4,27 +4,54 @@
  */
 
 import React, { useState, useEffect, useRef } from 'react';
-import { AppState, RoutineItem, DayOfWeek, DAYS_OF_WEEK } from './types';
+import { AppState, RoutineItem, DayOfWeek, DAYS_OF_WEEK, ThemeMode } from './types';
 import { loadAppState, saveAppState, uid } from './utils/storage';
 import {
   getCurrentDayName,
-  getLiveRoutineStatus,
   parseTimeToMinutes,
   playBellChime,
   triggerSystemNotification,
-  LiveRoutineStatus,
+  formatStartNotification,
+  formatEndNotification,
+  isDarkModeActive,
+  requestNotificationPermission,
 } from './utils/notificationService';
 import { Header } from './components/Header';
-import { LiveClassBanner } from './components/LiveClassBanner';
+import { LeftMenu } from './components/LeftMenu';
+import { LiveClassBar } from './components/LiveClassBar';
 import { RoutineView } from './components/RoutineView';
 import { RoutineModal } from './components/RoutineModal';
 import { BtebBooklistModal } from './components/BtebBooklistModal';
 import { ScheduleSettingsModal } from './components/ScheduleSettingsModal';
+import { DepartmentBackground } from './components/DepartmentBackground';
+import { BiometricAuthModal } from './components/BiometricAuthModal';
 import { Toast, ToastMessage } from './components/Toast';
+import {
+  getCurrentUser,
+  logoutUser,
+  syncCurrentAccount,
+  UserAccount,
+} from './utils/authDatabase';
 
 export default function App() {
   const [state, setState] = useState<AppState>(() => loadAppState());
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getCurrentDayName());
+
+  // Logged-in User Account State (Phone & Biometric)
+  const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getCurrentUser());
+  const [authModal, setAuthModal] = useState<{
+    isOpen: boolean;
+    mode: 'login' | 'register';
+  }>({
+    isOpen: false,
+    mode: 'login',
+  });
+
+  // Search State driven from Top Header
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Left Sidebar / Menu State
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   // Modal states
   const [routineModal, setRoutineModal] = useState<{
@@ -53,115 +80,224 @@ export default function App() {
     saveAppState(state);
   }, [state]);
 
+  // Dark Mode calculation & immediate DOM synchronization
+  const isDark = isDarkModeActive(state.theme);
+
+  useEffect(() => {
+    const applyTheme = () => {
+      const darkActive = isDarkModeActive(state.theme);
+      if (darkActive) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    };
+
+    applyTheme();
+    // In schedule mode, re-evaluate every 15 seconds
+    const timer = setInterval(applyTheme, 15000);
+    return () => clearInterval(timer);
+  }, [state.theme]);
+
+  // Instant 1-tap Theme Switcher
+  const handleToggleTheme = () => {
+    const nextMode: ThemeMode = isDark ? 'light' : 'dark';
+    if (nextMode === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+
+    setState((prev) => {
+      const nextState: AppState = {
+        ...prev,
+        theme: {
+          ...prev.theme,
+          mode: nextMode,
+        },
+      };
+      saveAppState(nextState);
+      return nextState;
+    });
+
+    showToast(nextMode === 'dark' ? 'Dark Mode Enabled 🌙' : 'Light Mode Enabled ☀️', 'info');
+  };
+
+  // Instant Notification Permission Request & Toggle
+  const handleToggleNotifications = async () => {
+    if (!state.notifications.enabled) {
+      const perm = await requestNotificationPermission();
+      if (perm === 'granted') {
+        const nextNotifications = { ...state.notifications, enabled: true };
+        setState((prev) => {
+          const next = { ...prev, notifications: nextNotifications };
+          saveAppState(next);
+          return next;
+        });
+        playBellChime();
+        triggerSystemNotification('Push Notifications Active! 🔔', {
+          body: 'You will receive offline alerts when class starts and ends.',
+        });
+        showToast('Push Notifications Allowed! 🔔', 'success');
+      } else {
+        showToast('Notification permission was blocked in browser settings', 'error');
+      }
+    } else {
+      const nextNotifications = { ...state.notifications, enabled: false };
+      setState((prev) => {
+        const next = { ...prev, notifications: nextNotifications };
+        saveAppState(next);
+        return next;
+      });
+      showToast('Notifications disabled', 'info');
+    }
+  };
+
   // Track fired notifications so we don't spam within the same minute
   const firedAlertsRef = useRef<Set<string>>(new Set());
 
-  // Live Routine calculation
-  const [liveStatus, setLiveStatus] = useState<LiveRoutineStatus>({
-    currentClass: null,
-    minutesRemainingInClass: 0,
-    nextClass: null,
-    minutesUntilNextClass: 0,
-  });
+  // Date tracking for automatic Midnight (12:00 AM) rollover
+  const lastDateKeyRef = useRef<string>(
+    `${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`
+  );
 
-  // Background ticker for live class status & offline class start/end push notifications
+  // Background ticker for 12:00 AM rollover & offline class start/end push notifications & bell chimes
   useEffect(() => {
     const checkSchedule = () => {
       const now = new Date();
+      const currentDateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+
+      // Midnight Rollover Check: If date changed past 12:00 AM, automatically switch day!
+      if (lastDateKeyRef.current !== currentDateKey) {
+        lastDateKeyRef.current = currentDateKey;
+        const newAcademicDay = getCurrentDayName();
+        setSelectedDay(newAcademicDay);
+        firedAlertsRef.current.clear();
+      }
+
       const currentDay = getCurrentDayName();
       const todayRoutines = state.routines.filter((r) => r.day === currentDay);
-      const status = getLiveRoutineStatus(todayRoutines, now);
-      setLiveStatus(status);
 
       if (!state.notifications.enabled) return;
 
       const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      const dateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 
       for (const item of todayRoutines) {
         const startMin = parseTimeToMinutes(item.startTime);
         const endMin = parseTimeToMinutes(item.endTime);
 
-        // Check Class Start Notification
+        // Check Class Start Notification: "Subject - Start At Time - Room/Lab."
         if (startMin !== null && currentMinutes === startMin) {
-          const alertKey = `start_${item.id}_${dateKey}_${startMin}`;
+          const alertKey = `start_${item.id}_${currentDateKey}_${startMin}`;
           if (!firedAlertsRef.current.has(alertKey)) {
             firedAlertsRef.current.add(alertKey);
             if (state.notifications.notifyOnStart) {
-              triggerSystemNotification(`Class Started: ${item.subjectName}`, {
-                body: `Time: ${item.startTime} – ${item.endTime}${item.room ? ' • ' + item.room : ''}${item.teacherName ? ' • ' + item.teacherName : ''}`,
+              const startMsg = formatStartNotification(item);
+              triggerSystemNotification(startMsg, {
+                body: item.teacherName ? `Teacher: ${item.teacherName}` : 'Class is starting now!',
               });
               if (state.notifications.soundEnabled) {
                 playBellChime();
               }
-              showToast(`🔔 Class Started: ${item.subjectName} (${item.room || 'Room N/A'})`, 'info');
+              showToast(`🔔 ${startMsg}`, 'info');
             }
           }
         }
 
-        // Check Class End Notification
+        // Check Class End Notification: "Subject - Ended At Time - Room/Lab."
         if (endMin !== null && currentMinutes === endMin) {
-          const alertKey = `end_${item.id}_${dateKey}_${endMin}`;
+          const alertKey = `end_${item.id}_${currentDateKey}_${endMin}`;
           if (!firedAlertsRef.current.has(alertKey)) {
             firedAlertsRef.current.add(alertKey);
             if (state.notifications.notifyOnEnd) {
-              triggerSystemNotification(`Class Ended: ${item.subjectName}`, {
-                body: `Ended at ${item.endTime}. Next session or break time!`,
+              const endMsg = formatEndNotification(item);
+              triggerSystemNotification(endMsg, {
+                body: 'Class has concluded. Break or next session!',
               });
               if (state.notifications.soundEnabled) {
                 playBellChime();
               }
-              showToast(`🔔 Class Ended: ${item.subjectName}`, 'info');
+              showToast(`🔔 ${endMsg}`, 'info');
             }
           }
         }
       }
     };
 
-    // Run initially
     checkSchedule();
-
-    // Check every 10 seconds for precise time matching
-    const timer = setInterval(checkSchedule, 10000);
+    const timer = setInterval(checkSchedule, 5000);
     return () => clearInterval(timer);
   }, [state.routines, state.notifications]);
 
-  // Routine Handlers
+  // Routine Handlers with immediate LocalStorage and Auth Database persistence
   const handleSaveRoutine = (savedRoutine: RoutineItem) => {
     setState((prev) => {
       const exists = prev.routines.some((r) => r.id === savedRoutine.id);
       const updated = exists
         ? prev.routines.map((r) => (r.id === savedRoutine.id ? savedRoutine : r))
         : [...prev.routines, savedRoutine];
-      return { ...prev, routines: updated };
+      const nextState = { ...prev, routines: updated };
+      saveAppState(nextState);
+      syncCurrentAccount(updated, nextState);
+      return nextState;
     });
-    showToast('Class routine saved successfully! 📅', 'success');
+    showToast('Class saved to routine 📅', 'success');
   };
 
   const handleDeleteRoutine = (routineId: string) => {
-    setState((prev) => ({
-      ...prev,
-      routines: prev.routines.filter((r) => r.id !== routineId),
-    }));
-    showToast('Class removed from routine', 'info');
-  };
-
-  const handleUpdateNotifications = (updated: AppState['notifications']) => {
-    setState((prev) => ({ ...prev, notifications: updated }));
-    showToast(
-      updated.enabled ? 'Push notifications active 🔔' : 'Notifications disabled',
-      'info'
-    );
+    setState((prev) => {
+      const updated = prev.routines.filter((r) => r.id !== routineId);
+      const nextState = { ...prev, routines: updated };
+      saveAppState(nextState);
+      syncCurrentAccount(updated, nextState);
+      return nextState;
+    });
+    showToast('Class deleted from routine', 'info');
   };
 
   const handleUpdateAppState = (updated: Partial<AppState>) => {
-    setState((prev) => ({ ...prev, ...updated }));
+    setState((prev) => {
+      const nextState = { ...prev, ...updated };
+      saveAppState(nextState);
+      syncCurrentAccount(nextState.routines, nextState);
+      return nextState;
+    });
     showToast('Settings saved successfully', 'success');
   };
 
   const handleResetRoutines = () => {
-    setState((prev) => ({ ...prev, routines: [] }));
+    setState((prev) => {
+      const nextState = { ...prev, routines: [] };
+      saveAppState(nextState);
+      syncCurrentAccount([], nextState);
+      return nextState;
+    });
     showToast('All class routines cleared', 'info');
+  };
+
+  // Auth Handlers for Phone & Biometric Fingerprint
+  const handleLoginSuccess = (account: UserAccount) => {
+    setCurrentUser(account);
+    if (account.routines && account.routines.length > 0) {
+      setState((prev) => {
+        const next = {
+          ...prev,
+          routines: account.routines,
+          departmentName: account.department || prev.departmentName,
+          semesterName: account.semester || prev.semesterName,
+          shift: account.shift || prev.shift,
+        };
+        saveAppState(next);
+        return next;
+      });
+    }
+    showToast(`Logged in as ${account.phoneNumber} 🛡️`, 'success');
+  };
+
+  const handleLogout = () => {
+    logoutUser();
+    setCurrentUser(null);
+    showToast('Logged out of account', 'info');
   };
 
   const handleSelectBtebSubject = (subject: { code: string; name: string }) => {
@@ -174,13 +310,21 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 text-slate-900 font-sans antialiased overflow-x-hidden">
-      {/* App Header */}
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased overflow-x-hidden transition-colors relative">
+      {/* Dynamic Department Themed Ambient Background */}
+      <DepartmentBackground departmentName={state.departmentName} />
+
+      {/* Top Header with Hamburger Menu and Search Bar */}
       <Header
-        departmentName={state.departmentName}
-        semesterName={state.semesterName}
-        notifications={state.notifications}
-        onUpdateNotifications={handleUpdateNotifications}
+        onOpenMenu={() => setIsMenuOpen(true)}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+      />
+
+      {/* Left Sidebar Menu Drawer */}
+      <LeftMenu
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
         onOpenAddClass={() =>
           setRoutineModal({
             isOpen: true,
@@ -191,26 +335,21 @@ export default function App() {
         }
         onOpenBtebHub={() => setBtebModalOpen(true)}
         onOpenSettings={() => setSettingsModalOpen(true)}
+        currentUser={currentUser}
+        onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode: mode || 'login' })}
+        onLogout={handleLogout}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-5xl w-full mx-auto px-4 py-4 sm:py-5 space-y-4">
-        {/* Live Class in Progress / Upcoming Next Alert */}
-        <LiveClassBanner status={liveStatus} />
+      <main className="flex-1 max-w-5xl w-full mx-auto px-3 sm:px-5 py-3 sm:py-4 space-y-4 relative z-10">
+        {/* Real-Time Live Status Bar (No "Live" text) */}
+        <LiveClassBar routines={state.routines} />
 
-        {/* Weekly Routine Manager View */}
+        {/* Clear, Pure Routine Schedule View */}
         <RoutineView
           routines={state.routines}
           selectedDay={selectedDay}
           onChangeDay={setSelectedDay}
-          onOpenAddRoutine={(day) =>
-            setRoutineModal({
-              isOpen: true,
-              editingRoutine: null,
-              defaultDay: day || selectedDay,
-              prefilledSubject: null,
-            })
-          }
           onOpenEditRoutine={(routine) =>
             setRoutineModal({
               isOpen: true,
@@ -220,11 +359,12 @@ export default function App() {
             })
           }
           onDeleteRoutine={handleDeleteRoutine}
-          onOpenBteb={() => setBtebModalOpen(true)}
+          searchQuery={searchQuery}
+          onClearSearch={() => setSearchQuery('')}
         />
       </main>
 
-      {/* Routine Add / Edit Modal */}
+      {/* Routine Add / Edit Modal with Android DeskClock Time Picker */}
       {routineModal.isOpen && (
         <RoutineModal
           isOpen={routineModal.isOpen}
@@ -254,7 +394,7 @@ export default function App() {
         />
       )}
 
-      {/* Settings & Offline Alerts Modal */}
+      {/* Settings Modal (Appearance, Dark Mode Schedule, Institute details, Bell alerts, Backup & Clear data) */}
       {settingsModalOpen && (
         <ScheduleSettingsModal
           isOpen={settingsModalOpen}
@@ -265,20 +405,20 @@ export default function App() {
         />
       )}
 
+      {/* Passwordless Biometric Fingerprint Auth Modal */}
+      {authModal.isOpen && (
+        <BiometricAuthModal
+          isOpen={authModal.isOpen}
+          onClose={() => setAuthModal({ isOpen: false, mode: 'login' })}
+          initialMode={authModal.mode}
+          onLoginSuccess={handleLoginSuccess}
+          currentRoutines={state.routines}
+          appState={state}
+        />
+      )}
+
       {/* Global In-App Toast */}
       <Toast toast={toast} onDismiss={() => setToast(null)} />
-
-      {/* Footer */}
-      <footer className="border-t border-slate-200 bg-white py-4 mt-auto text-center text-xs text-slate-500">
-        <div className="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div className="font-semibold text-slate-700">
-            Routine Manager
-          </div>
-          <div className="text-slate-400">
-            Offline Ready • PWA
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

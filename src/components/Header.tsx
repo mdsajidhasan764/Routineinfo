@@ -1,118 +1,65 @@
-import React, { useState } from 'react';
-import { Calendar, Bell, BellOff, Volume2, Settings, BookOpen, Plus } from 'lucide-react';
-import { PWAInstallButton } from './PWAInstallButton';
-import { NotificationSettings } from '../types';
-import { playBellChime, requestNotificationPermission } from '../utils/notificationService';
+import React from 'react';
+import { Menu, Calendar, Search, X } from 'lucide-react';
 
 interface HeaderProps {
-  departmentName?: string;
-  semesterName?: string;
-  notifications: NotificationSettings;
-  onUpdateNotifications: (updated: NotificationSettings) => void;
-  onOpenAddClass: () => void;
-  onOpenBtebHub: () => void;
-  onOpenSettings: () => void;
+  onOpenMenu: () => void;
+  searchQuery: string;
+  onSearchChange: (query: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  departmentName,
-  semesterName,
-  notifications,
-  onUpdateNotifications,
-  onOpenAddClass,
-  onOpenBtebHub,
-  onOpenSettings,
+  onOpenMenu,
+  searchQuery,
+  onSearchChange,
 }) => {
-  const [bellPlaying, setBellPlaying] = useState(false);
-
-  const handleToggleNotifications = async () => {
-    if (!notifications.enabled) {
-      const perm = await requestNotificationPermission();
-      if (perm === 'granted') {
-        onUpdateNotifications({ ...notifications, enabled: true });
-      } else {
-        alert('Notification permission was blocked in browser settings.');
-      }
-    } else {
-      onUpdateNotifications({ ...notifications, enabled: false });
-    }
-  };
-
-  const handleTestChime = () => {
-    setBellPlaying(true);
-    playBellChime();
-    setTimeout(() => setBellPlaying(false), 1200);
-  };
-
   return (
-    <header className="sticky top-0 z-40 bg-white border-b border-slate-200">
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
-        {/* Brand */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0">
-            <Calendar className="w-5 h-5" />
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-base font-bold text-slate-900 tracking-tight leading-none truncate">
-              Routine Manager
+    <header className="sticky top-0 z-30 bg-white/85 dark:bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-200/60 dark:border-zinc-800/60 transition-colors">
+      <div className="max-w-5xl mx-auto px-3 sm:px-5 py-2.5 flex items-center justify-between gap-3">
+        {/* Left Side: Menu button & App Title */}
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            className="p-2 -ml-1 rounded-xl text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/80 transition flex items-center gap-1.5 focus:outline-none cursor-pointer"
+            title="Open Menu"
+            aria-label="Open menu"
+          >
+            <Menu className="w-5 h-5 stroke-[2]" />
+            <span className="hidden xs:inline text-xs font-semibold text-zinc-700 dark:text-zinc-300">Menu</span>
+          </button>
+
+          <div className="h-4 w-px bg-zinc-200 dark:bg-zinc-800 hidden xs:block" />
+
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold shadow-xs shrink-0">
+              <Calendar className="w-4 h-4 stroke-[2.2]" />
+            </div>
+            <h1 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-white tracking-tight leading-none whitespace-nowrap hidden sm:block">
+              Class Routine
             </h1>
-            {departmentName && (
-              <p className="text-[11px] text-slate-500 truncate mt-1">
-                {departmentName} {semesterName ? `· ${semesterName}` : ''}
-              </p>
-            )}
           </div>
         </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <PWAInstallButton />
-
-          <button
-            onClick={handleTestChime}
-            className={`p-2 rounded-xl border border-slate-200 text-slate-600 hover:text-emerald-700 hover:bg-emerald-50 transition ${
-              bellPlaying ? 'bg-emerald-100 text-emerald-800' : 'bg-white'
-            }`}
-            title="Test Bell Chime"
-          >
-            <Volume2 className="w-4 h-4" />
-          </button>
-
-          <button
-            onClick={handleToggleNotifications}
-            className={`p-2 rounded-xl border transition ${
-              notifications.enabled
-                ? 'border-emerald-300 bg-emerald-50 text-emerald-700'
-                : 'border-slate-200 bg-white text-slate-400'
-            }`}
-            title={notifications.enabled ? 'Notifications Active' : 'Enable Notifications'}
-          >
-            {notifications.enabled ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
-          </button>
-
-          <button
-            onClick={onOpenBtebHub}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 transition"
-          >
-            <BookOpen className="w-4 h-4 text-emerald-600" />
-            <span className="hidden sm:inline">BTEB Books</span>
-          </button>
-
-          <button
-            onClick={onOpenAddClass}
-            className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 transition shadow-2xs"
-          >
-            <Plus className="w-4 h-4 stroke-[2.5]" />
-            <span>Add Class</span>
-          </button>
-
-          <button
-            onClick={onOpenSettings}
-            className="p-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 transition"
-            title="Settings & Backup"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+        {/* Center / Right: Clean Search Bar */}
+        <div className="flex-1 max-w-md ml-auto relative">
+          <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search class, code, room, teacher..."
+            className="w-full pl-9 pr-8 py-1.5 sm:py-2 text-xs sm:text-sm bg-zinc-100/80 dark:bg-zinc-900/80 hover:bg-zinc-100 dark:hover:bg-zinc-900 focus:bg-white dark:focus:bg-zinc-950 rounded-xl border border-zinc-200/80 dark:border-zinc-800 text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-emerald-500/50 transition shadow-2xs"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => onSearchChange('')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 transition"
+              title="Clear search"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </header>

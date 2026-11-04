@@ -1,20 +1,16 @@
 export type DayOfWeek =
-  | 'Saturday'
   | 'Sunday'
   | 'Monday'
   | 'Tuesday'
   | 'Wednesday'
-  | 'Thursday'
-  | 'Friday';
+  | 'Thursday';
 
 export const DAYS_OF_WEEK: DayOfWeek[] = [
-  'Saturday',
   'Sunday',
   'Monday',
   'Tuesday',
   'Wednesday',
   'Thursday',
-  'Friday',
 ];
 
 export interface RoutineItem {
@@ -39,6 +35,14 @@ export interface NotificationSettings {
   advanceMinutes: number;
 }
 
+export type ThemeMode = 'light' | 'dark' | 'schedule';
+
+export interface ThemeSettings {
+  mode: ThemeMode;
+  scheduleStart: string; // e.g. "19:00"
+  scheduleEnd: string;   // e.g. "06:00"
+}
+
 export interface AppState {
   routines: RoutineItem[];
   departmentSlug: string;
@@ -49,6 +53,7 @@ export interface AppState {
   shift: string;
   section: string;
   notifications: NotificationSettings;
+  theme: ThemeSettings;
 }
 
 // Backward compatibility types for btebService.ts exports
