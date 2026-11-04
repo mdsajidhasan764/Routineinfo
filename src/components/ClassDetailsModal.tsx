@@ -35,7 +35,6 @@ export const ClassDetailsModal: React.FC<ClassDetailsModalProps> = ({
   onDeleteRoutine,
 }) => {
   const [copiedPhone, setCopiedPhone] = useState(false);
-  const [savedContact, setSavedContact] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   // Current time for live status
@@ -45,7 +44,6 @@ export const ClassDetailsModal: React.FC<ClassDetailsModalProps> = ({
     if (!isOpen) {
       setConfirmDelete(false);
       setCopiedPhone(false);
-      setSavedContact(false);
       return;
     }
     const timer = setInterval(() => setNow(new Date()), 1000);
@@ -60,19 +58,6 @@ export const ClassDetailsModal: React.FC<ClassDetailsModalProps> = ({
     if (ok) {
       setCopiedPhone(true);
       setTimeout(() => setCopiedPhone(false), 2000);
-    }
-  };
-
-  const handleSaveContact = () => {
-    if (!routine.teacherPhone) return;
-    const ok = saveContactToPhone(
-      routine.teacherName || 'Teacher',
-      routine.teacherPhone,
-      routine.subjectName
-    );
-    if (ok) {
-      setSavedContact(true);
-      setTimeout(() => setSavedContact(false), 2000);
     }
   };
 
@@ -225,25 +210,7 @@ export const ClassDetailsModal: React.FC<ClassDetailsModalProps> = ({
             </div>
           </div>
 
-          {/* Shift & Group Info Card */}
-          <div className="p-3.5 rounded-2xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/80 dark:border-zinc-700/80 flex items-center justify-between text-xs">
-            <div>
-              <div className="text-zinc-500 dark:text-zinc-400 font-semibold text-[11px]">Academic Shift</div>
-              <div className="font-bold text-zinc-900 dark:text-white text-sm mt-0.5">
-                {shiftLabel}
-              </div>
-            </div>
-            {routine.group && (
-              <div className="text-right">
-                <div className="text-zinc-500 dark:text-zinc-400 font-semibold text-[11px]">Section Group</div>
-                <div className="font-bold text-blue-600 dark:text-blue-400 text-sm mt-0.5">
-                  Group {routine.group}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Teacher Contact Section */}
+           {/* Teacher Contact Section */}
           {(routine.teacherName || routine.teacherPhone) && (
             <div className="p-4 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-transparent dark:from-emerald-950/40 dark:via-zinc-900 dark:to-transparent border border-emerald-500/20 dark:border-emerald-800/40 space-y-3">
               <div className="flex items-center justify-between">
@@ -266,7 +233,7 @@ export const ClassDetailsModal: React.FC<ClassDetailsModalProps> = ({
 
               {/* Direct Native Action Buttons */}
               {routine.teacherPhone && (
-                <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className="grid grid-cols-2 gap-2 pt-1">
                   {/* 1. Direct Call */}
                   <a
                     href={`tel:${routine.teacherPhone}`}
@@ -276,27 +243,7 @@ export const ClassDetailsModal: React.FC<ClassDetailsModalProps> = ({
                     <span>Call</span>
                   </a>
 
-                  {/* 2. Direct Save Contact to Phone Contacts (No vCard file download) */}
-                  <button
-                    type="button"
-                    onClick={handleSaveContact}
-                    className="py-2.5 px-2 rounded-xl bg-white dark:bg-zinc-800 border border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 shadow-2xs transition active:scale-98 cursor-pointer"
-                    title="Directly opens phone Contacts app to save"
-                  >
-                    {savedContact ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span>Saved!</span>
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                        <span>Save Contact</span>
-                      </>
-                    )}
-                  </button>
-
-                  {/* 3. Copy Phone Number */}
+                  {/* 2. Copy Phone Number */}
                   <button
                     type="button"
                     onClick={handleCopyPhone}

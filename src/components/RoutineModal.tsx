@@ -4,6 +4,7 @@ import { RoutineItem, DayOfWeek, DAYS_OF_WEEK } from '../types';
 import { uid, cleanTitle } from '../utils/storage';
 import { getAllDepartments, BtebSubjectItem } from '../services/btebService';
 import { ClockTimePickerModal } from './ClockTimePickerModal';
+import { parseTimeToMinutes, formatMinutesToTime } from '../utils/notificationService';
 
 interface RoutineModalProps {
   isOpen: boolean;
@@ -56,6 +57,44 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
   const [teacherName, setTeacherName] = useState('');
   const [teacherPhone, setTeacherPhone] = useState('');
   const [note, setNote] = useState('');
+
+  // Load saved teacher directory from localStorage
+  const savedTeachers = useMemo(() => {
+    try {
+      const raw = localStorage.getItem('bteb_teacher_directory');
+      return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  }, [isOpen]);
+
+  const teacherNamesList = useMemo(() => {
+    return Object.keys(savedTeachers);
+  }, [savedTeachers]);
+
+  const handleTeacherNameChange = (name: string) => {
+    setTeacherName(name);
+    const trimmed = name.trim();
+    if (savedTeachers[trimmed]) {
+      setTeacherPhone(savedTeachers[trimmed]);
+    }
+  };
+
+  const applyDuration = (minutesToAdd: number) => {
+    const startMins = parseTimeToMinutes(startTime);
+    if (startMins !== null) {
+      const endMins = startMins + minutesToAdd;
+      setEndTime(formatMinutesToTime(endMins));
+    }
+  };
+
+  const matchingTeachers = useMemo(() => {
+    const q = teacherName.trim().toLowerCase();
+    if (q.length < 1) return [];
+    return Object.entries(savedTeachers).filter(([name]) =>
+      name.toLowerCase().includes(q)
+    );
+  }, [teacherName, savedTeachers]);
 
   // Clock screen time picker state
   const [clockPickerTarget, setClockPickerTarget] = useState<'start' | 'end' | null>(null);
@@ -126,6 +165,17 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
     if (!subjectName.trim()) {
       alert('Please enter a subject name');
       return;
+    }
+
+    // Save teacher to directory if name and phone are provided
+    if (teacherName.trim() && teacherPhone.trim()) {
+      try {
+        const dir = savedTeachers;
+        dir[teacherName.trim()] = teacherPhone.trim();
+        localStorage.setItem('bteb_teacher_directory', JSON.stringify(dir));
+      } catch {
+        // ignore
+      }
     }
 
     const item: RoutineItem = {
@@ -326,6 +376,32 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
                   </div>
                 </div>
               </div>
+
+              {/* Quick Duration Presets */}
+              <div className="flex items-center gap-1.5 pt-1 flex-wrap text-[11px]">
+                <span className="text-slate-500 font-bold">Quick Duration:</span>
+                <button
+                  type="button"
+                  onClick={() => applyDuration(45)}
+                  className="px-2 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-bold hover:bg-emerald-100 transition cursor-pointer"
+                >
+                  Theory (45m) ⏱️
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyDuration(60)}
+                  className="px-2 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300 font-bold hover:bg-blue-100 transition cursor-pointer"
+                >
+                  1 Hour (60m) ⏱️
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applyDuration(135)}
+                  className="px-2 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 font-bold hover:bg-amber-100 transition cursor-pointer"
+                >
+                  Lab / Practical (2h 15m) 🔬
+                </button>
+              </div>
             </div>
 
             {/* Room / Lab */}
@@ -415,10 +491,27 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
                   <input
                     type="text"
                     value={teacherName}
-                    onChange={(e) => setTeacherName(e.target.value)}
+                    onChange={(e) => handleTeacherNameChange(e.target.value)}
                     placeholder="e.g. Sajid Islam"
                     className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500"
                   />
+                  {matchingTeachers.length > 0 && teacherName.trim().length > 0 && (
+                    <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden max-h-44 overflow-y-auto">
+                      {matchingTeachers.map(([name, phone]) => (
+                        <div
+                          key={name}
+                          onClick={() => {
+                            setTeacherName(name);
+                            setTeacherPhone(phone);
+                          }}
+                          className="px-3 py-2.5 text-xs hover:bg-emerald-50 dark:hover:bg-emerald-950/60 cursor-pointer flex items-center justify-between text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700/50 last:border-none"
+                        >
+                          <span className="font-bold">{name}</span>
+                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{phone}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 

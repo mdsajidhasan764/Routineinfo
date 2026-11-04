@@ -189,21 +189,6 @@ export function triggerSystemNotification(title: string, options?: NotificationO
     }
   }
 
-  // Dispatch in-app push notification event for immediate on-screen visibility
-  if (typeof window !== 'undefined') {
-    try {
-      const event = new CustomEvent('routine_push_alert', {
-        detail: {
-          title,
-          body: (options as any)?.body || '',
-        },
-      });
-      window.dispatchEvent(event);
-    } catch {
-      // ignore
-    }
-  }
-
   if (typeof window === 'undefined' || !('Notification' in window)) return;
 
   if (Notification.permission === 'granted') {
@@ -211,10 +196,13 @@ export function triggerSystemNotification(title: string, options?: NotificationO
       icon: '/icon.svg',
       badge: '/icon.svg',
       silent: false,
-      tag: options?.tag || 'bteb-routine-alert',
+      tag: options?.tag || 'bteb-android-routine-system-alert',
       renotify: true,
       requireInteraction: true,
       vibrate: [200, 100, 200, 100, 350],
+      channelId: 'bteb_routine_channel_android',
+      priority: 'high',
+      importance: 'max',
       ...options,
     };
 

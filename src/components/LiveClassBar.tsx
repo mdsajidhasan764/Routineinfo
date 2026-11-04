@@ -304,9 +304,9 @@ export const LiveClassBar: React.FC<LiveClassBarProps> = ({ routines }) => {
             </div>
 
             <div className="shrink-0 flex items-center gap-2 bg-zinc-100 dark:bg-zinc-800/60 px-3 py-2 rounded-xl text-xs">
-              <Coffee className="w-4 h-4 text-amber-500" />
+              <Clock className="w-4 h-4 text-amber-500" />
               <div>
-                <div className="font-semibold text-zinc-800 dark:text-zinc-200">Break</div>
+                <div className="font-semibold text-zinc-800 dark:text-zinc-200">Upcoming</div>
                 <div className="text-[10px] text-zinc-500 dark:text-zinc-400 font-mono">{minWaitMinutes}m wait</div>
               </div>
             </div>

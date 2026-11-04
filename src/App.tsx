@@ -144,17 +144,7 @@ export default function App() {
     }
   }, [state.routines]);
 
-  // Listen to custom in-app push notification events
-  useEffect(() => {
-    const handlePushAlert = (e: any) => {
-      const { title, body } = e.detail || {};
-      if (title) {
-        showToast(`🔔 ${title}${body ? ` (${body})` : ''}`, 'info');
-      }
-    };
-    window.addEventListener('routine_push_alert', handlePushAlert);
-    return () => window.removeEventListener('routine_push_alert', handlePushAlert);
-  }, []);
+
 
   // Instant 1-tap Theme Switcher
   const handleToggleTheme = () => {
@@ -268,7 +258,6 @@ export default function App() {
               if (state.notifications.soundEnabled) {
                 playBellChime();
               }
-              showToast(`🔔 ${startMsg}`, 'info');
             }
           }
         }
@@ -289,7 +278,6 @@ export default function App() {
               if (state.notifications.soundEnabled) {
                 playBellChime();
               }
-              showToast(`🔔 ${endMsg}`, 'info');
             }
           }
         }

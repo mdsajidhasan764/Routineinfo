@@ -20,18 +20,21 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
     <script>
-      // Gracefully prevent unhandled Vite HMR client errors when WebSocket is closed/disabled in cloud dev environment
+      // Gracefully intercept and suppress any Vite HMR / PWA client registration send errors
       window.addEventListener('error', function (e) {
-        if (e && e.message && (e.message.indexOf("reading 'send'") !== -1 || e.message.indexOf("Cannot read properties of undefined") !== -1 && e.filename && e.filename.indexOf('@vite/client') !== -1)) {
+        const msg = (e && (e.message || '')) + '';
+        const file = (e && (e.filename || '')) + '';
+        if (msg.indexOf('send') !== -1 || file.indexOf('@vite') !== -1 || file.indexOf('pwa-entry-point') !== -1) {
           e.stopImmediatePropagation();
           e.preventDefault();
         }
-      });
+      }, true);
       window.addEventListener('unhandledrejection', function (e) {
-        if (e && e.reason && e.reason.message && e.reason.message.indexOf("reading 'send'") !== -1) {
+        const msg = (e && e.reason && (e.reason.message || e.reason)) ? String(e.reason.message || e.reason) : '';
+        if (msg.indexOf('send') !== -1 || msg.indexOf('SendBeforeConnect') !== -1) {
           e.preventDefault();
         }
-      });
+      }, true);
     </script>
   </head>
   <body class="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white min-h-screen">

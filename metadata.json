@@ -1,6 +1,6 @@
 {
-  "name": "Semester Track Pro",
-  "description": "Smart academic command center to track semester syllabus chapters, study hours, daily logs, and exam preparation.",
+  "name": "BTEB Routine Manager",
+  "description": "Offline Institute Class Routine Manager with class start and end alerts for BTEB polytechnic students.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -343,25 +343,7 @@ export const RoutineView: React.FC<RoutineViewProps> = ({
                               )}
                             </button>
 
-                            <button
-                              type="button"
-                              onClick={(e) => handleSaveContact(e, routine)}
-                              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition text-[11px] font-medium cursor-pointer"
-                              title="Directly opens phone Contacts app to save without downloading file"
-                            >
-                              {savedContactId === routine.id ? (
-                                <>
-                                  <Check className="w-3 h-3 text-emerald-500" />
-                                  <span className="text-emerald-600 dark:text-emerald-400">Saved!</span>
-                                </>
-                              ) : (
-                                <>
-                                  <UserPlus className="w-3 h-3 text-blue-500" />
-                                  <span>Save Contact</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
+                            </div>
                         )}
                       </div>
                     )}
