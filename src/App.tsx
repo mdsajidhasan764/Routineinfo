@@ -119,6 +119,31 @@ export default function App() {
     }
   }, []);
 
+  // Check if app was opened via notification click or search parameter
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const routineIdParam = params.get('routineId');
+    if (routineIdParam && state.routines.length > 0) {
+      const found = state.routines.find((r) => r.id === routineIdParam);
+      if (found) {
+        setDetailsRoutine(found);
+        window.history.replaceState({}, '', window.location.pathname);
+        return;
+      }
+    }
+
+    const pendingId = localStorage.getItem('bteb_pending_notification_routine');
+    const pendingTime = Number(localStorage.getItem('bteb_pending_notification_time') || '0');
+    if (pendingId && Date.now() - pendingTime < 60 * 60 * 1000 && state.routines.length > 0) {
+      const found = state.routines.find((r) => r.id === pendingId);
+      if (found) {
+        setDetailsRoutine(found);
+        localStorage.removeItem('bteb_pending_notification_routine');
+        localStorage.removeItem('bteb_pending_notification_time');
+      }
+    }
+  }, [state.routines]);
+
   // Listen to custom in-app push notification events
   useEffect(() => {
     const handlePushAlert = (e: any) => {
@@ -234,8 +259,11 @@ export default function App() {
             firedAlertsRef.current.add(alertKey);
             if (state.notifications.notifyOnStart) {
               const startMsg = formatStartNotification(item);
+              localStorage.setItem('bteb_pending_notification_routine', item.id);
+              localStorage.setItem('bteb_pending_notification_time', String(Date.now()));
               triggerSystemNotification(startMsg, {
                 body: item.teacherName ? `Teacher: ${item.teacherName}` : 'Class is starting now!',
+                data: { routineId: item.id },
               });
               if (state.notifications.soundEnabled) {
                 playBellChime();
@@ -252,8 +280,11 @@ export default function App() {
             firedAlertsRef.current.add(alertKey);
             if (state.notifications.notifyOnEnd) {
               const endMsg = formatEndNotification(item);
+              localStorage.setItem('bteb_pending_notification_routine', item.id);
+              localStorage.setItem('bteb_pending_notification_time', String(Date.now()));
               triggerSystemNotification(endMsg, {
                 body: 'Class has concluded. Break or next session!',
+                data: { routineId: item.id },
               });
               if (state.notifications.soundEnabled) {
                 playBellChime();
