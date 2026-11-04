@@ -7,9 +7,13 @@ import {
   Coffee,
   CheckCircle2,
   Calendar,
+  Copy,
+  Check,
+  UserPlus,
 } from 'lucide-react';
 import { RoutineItem } from '../types';
 import { parseTimeToMinutes } from '../utils/notificationService';
+import { copyPhoneNumber, saveContactToPhone } from '../utils/contactService';
 
 interface LiveClassBarProps {
   routines: RoutineItem[];
@@ -27,6 +31,8 @@ const REAL_DAY_NAMES = [
 
 export const LiveClassBar: React.FC<LiveClassBarProps> = ({ routines }) => {
   const [now, setNow] = useState<Date>(new Date());
+  const [copiedPhone, setCopiedPhone] = useState(false);
+  const [savedContact, setSavedContact] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -34,6 +40,22 @@ export const LiveClassBar: React.FC<LiveClassBarProps> = ({ routines }) => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  const handleCopyPhone = async (phone: string) => {
+    const ok = await copyPhoneNumber(phone);
+    if (ok) {
+      setCopiedPhone(true);
+      setTimeout(() => setCopiedPhone(false), 2000);
+    }
+  };
+
+  const handleSaveContact = (name: string, phone: string, subject: string) => {
+    const ok = saveContactToPhone(name, phone, subject);
+    if (ok) {
+      setSavedContact(true);
+      setTimeout(() => setSavedContact(false), 2000);
+    }
+  };
 
   const realDayIndex = now.getDay(); // 0 = Sun, 1 = Mon ... 5 = Fri, 6 = Sat
   const todayRealName = REAL_DAY_NAMES[realDayIndex];
@@ -200,13 +222,48 @@ export const LiveClassBar: React.FC<LiveClassBarProps> = ({ routines }) => {
               </div>
 
               {currentClass.teacherPhone && (
-                <a
-                  href={`tel:${currentClass.teacherPhone}`}
-                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl font-medium text-xs hover:bg-emerald-700 transition shadow-xs"
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Call Teacher</span>
-                </a>
+                <div className="shrink-0 flex items-center gap-1.5 flex-wrap">
+                  <a
+                    href={`tel:${currentClass.teacherPhone}`}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl font-medium text-xs hover:bg-emerald-700 transition shadow-xs"
+                    title={`কল করুন: ${currentClass.teacherName || 'Teacher'}`}
+                  >
+                    <Phone className="w-3.5 h-3.5" />
+                    <span>কল</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyPhone(currentClass.teacherPhone!)}
+                    className="px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition flex items-center gap-1 text-xs font-semibold"
+                    title="নম্বর কপি করুন"
+                  >
+                    {copiedPhone ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <Copy className="w-3.5 h-3.5 text-zinc-500 dark:text-zinc-400" />
+                    )}
+                    <span>{copiedPhone ? 'কপি হয়েছে' : 'কপি'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleSaveContact(
+                        currentClass.teacherName || 'Teacher',
+                        currentClass.teacherPhone!,
+                        currentClass.subjectName
+                      )
+                    }
+                    className="px-2.5 py-1.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700 transition flex items-center gap-1 text-xs font-semibold"
+                    title="ফোনে সেভ করুন (Save to Contacts)"
+                  >
+                    {savedContact ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                    ) : (
+                      <UserPlus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    )}
+                    <span>{savedContact ? 'সেভড' : 'সেভ'}</span>
+                  </button>
+                </div>
               )}
             </div>
 

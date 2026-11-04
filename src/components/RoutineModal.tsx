@@ -341,7 +341,7 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
                     type="text"
                     value={teacherName}
                     onChange={(e) => setTeacherName(e.target.value)}
-                    placeholder="e.g. Engr. Monirul Islam"
+                    placeholder="e.g. Sajid Islam"
                     className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:outline-emerald-500"
                   />
                 </div>

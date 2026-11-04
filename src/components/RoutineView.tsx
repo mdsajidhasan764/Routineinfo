@@ -9,9 +9,13 @@ import {
   Trash2,
   X,
   BookOpen,
+  Copy,
+  Check,
+  UserPlus,
 } from 'lucide-react';
 import { RoutineItem, DayOfWeek, DAYS_OF_WEEK } from '../types';
 import { getCurrentDayName, parseTimeToMinutes } from '../utils/notificationService';
+import { copyPhoneNumber, saveContactToPhone } from '../utils/contactService';
 
 interface RoutineViewProps {
   routines: RoutineItem[];
@@ -46,6 +50,23 @@ export const RoutineView: React.FC<RoutineViewProps> = ({
   onClearSearch,
 }) => {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [copiedPhoneId, setCopiedPhoneId] = useState<string | null>(null);
+  const [savedContactId, setSavedContactId] = useState<string | null>(null);
+
+  const handleCopyPhone = async (routineId: string, phone: string) => {
+    const ok = await copyPhoneNumber(phone);
+    if (ok) {
+      setCopiedPhoneId(routineId);
+      setTimeout(() => setCopiedPhoneId(null), 1500);
+    }
+  };
+
+  const handleSaveContact = (routine: RoutineItem) => {
+    if (!routine.teacherPhone) return;
+    saveContactToPhone(routine.teacherName || 'Teacher', routine.teacherPhone, routine.subjectName);
+    setSavedContactId(routine.id);
+    setTimeout(() => setSavedContactId(null), 1500);
+  };
 
   // Real-time current minutes for highlighting active class in schedule
   const [currentMinutes, setCurrentMinutes] = useState(() => {
@@ -280,11 +301,11 @@ export const RoutineView: React.FC<RoutineViewProps> = ({
                       </span>
                     </div>
 
-                    {/* Teacher & Phone */}
+                    {/* Teacher & Phone with Copy and Direct Save to Contacts */}
                     {(routine.teacherName || routine.teacherPhone) && (
-                      <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-2 text-xs">
+                      <div className="mt-3 pt-2.5 border-t border-zinc-100 dark:border-zinc-800/80 flex items-center justify-between gap-2 text-xs flex-wrap">
                         {routine.teacherName ? (
-                          <div className="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300">
+                          <div className="flex items-center gap-1.5 text-zinc-700 dark:text-zinc-300 font-medium">
                             <User className="w-3.5 h-3.5 text-zinc-400 shrink-0" />
                             <span>{routine.teacherName}</span>
                           </div>
@@ -293,13 +314,48 @@ export const RoutineView: React.FC<RoutineViewProps> = ({
                         )}
 
                         {routine.teacherPhone && (
-                          <a
-                            href={`tel:${routine.teacherPhone}`}
-                            className="flex items-center gap-1 font-mono text-emerald-600 dark:text-emerald-400 hover:underline text-xs"
-                          >
-                            <Phone className="w-3 h-3" />
-                            <span>{routine.teacherPhone}</span>
-                          </a>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <a
+                              href={`tel:${routine.teacherPhone}`}
+                              className="flex items-center gap-1 font-mono text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 px-2 py-0.5 rounded-md transition text-xs font-semibold"
+                              title="Call Teacher"
+                            >
+                              <Phone className="w-3 h-3" />
+                              <span>{routine.teacherPhone}</span>
+                            </a>
+
+                            <button
+                              type="button"
+                              onClick={() => handleCopyPhone(routine.id, routine.teacherPhone!)}
+                              className="p-1 rounded-md text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition cursor-pointer"
+                              title="Copy Number"
+                            >
+                              {copiedPhoneId === routine.id ? (
+                                <Check className="w-3.5 h-3.5 text-emerald-500 animate-in zoom-in" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleSaveContact(routine)}
+                              className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 transition text-[11px] font-medium cursor-pointer"
+                              title="Save Teacher Contact with Name directly to Phone"
+                            >
+                              {savedContactId === routine.id ? (
+                                <>
+                                  <Check className="w-3 h-3 text-emerald-500" />
+                                  <span className="text-emerald-600 dark:text-emerald-400">Saved!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <UserPlus className="w-3 h-3 text-blue-500" />
+                                  <span>Save Contact</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         )}
                       </div>
                     )}

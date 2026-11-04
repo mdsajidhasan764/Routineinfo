@@ -99,6 +99,24 @@ export default function App() {
     return () => clearInterval(timer);
   }, [state.theme]);
 
+  // Auto-request push notification permission on first app entry
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      requestNotificationPermission().then((perm) => {
+        if (perm === 'granted') {
+          setState((prev) => {
+            const next = {
+              ...prev,
+              notifications: { ...prev.notifications, enabled: true },
+            };
+            saveAppState(next);
+            return next;
+          });
+        }
+      });
+    }
+  }, []);
+
   // Instant 1-tap Theme Switcher
   const handleToggleTheme = () => {
     const nextMode: ThemeMode = isDark ? 'light' : 'dark';
@@ -402,6 +420,9 @@ export default function App() {
           state={state}
           onUpdateState={handleUpdateAppState}
           onResetRoutines={handleResetRoutines}
+          currentUser={currentUser}
+          onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode: mode || 'login' })}
+          onLogout={handleLogout}
         />
       )}
 
