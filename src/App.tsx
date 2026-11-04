@@ -15,15 +15,20 @@ import {
   formatEndNotification,
   isDarkModeActive,
   requestNotificationPermission,
+  getNotificationHistory,
+  saveNotificationRecord,
+  clearNotificationHistory,
 } from './utils/notificationService';
 import { Header } from './components/Header';
 import { LeftMenu } from './components/LeftMenu';
 import { LiveClassBar } from './components/LiveClassBar';
 import { RoutineView } from './components/RoutineView';
 import { RoutineModal } from './components/RoutineModal';
-import { BtebBooklistModal } from './components/BtebBooklistModal';
-import { ScheduleSettingsModal } from './components/ScheduleSettingsModal';
+import { BtebBooklistView } from './components/BtebBooklistView';
+import { ScheduleSettingsView } from './components/ScheduleSettingsView';
 import { ClassDetailsModal } from './components/ClassDetailsModal';
+import { NotificationHistoryModal } from './components/NotificationHistoryModal';
+import { ManageRoutinesModal } from './components/ManageRoutinesModal';
 import { DepartmentBackground } from './components/DepartmentBackground';
 import { BiometricAuthModal } from './components/BiometricAuthModal';
 import { Toast, ToastMessage } from './components/Toast';
@@ -37,6 +42,9 @@ import {
 export default function App() {
   const [state, setState] = useState<AppState>(() => loadAppState());
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getCurrentDayName(loadAppState().shift));
+
+  // Current Active App Screen/View: 'home' | 'bteb' | 'settings'
+  const [currentView, setCurrentView] = useState<'home' | 'bteb' | 'settings'>('home');
 
   // Logged-in User Account State (Phone & Biometric)
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getCurrentUser());
@@ -67,8 +75,9 @@ export default function App() {
     prefilledSubject: null,
   });
 
-  const [btebModalOpen, setBtebModalOpen] = useState(false);
-  const [settingsModalOpen, setSettingsModalOpen] = useState(false);
+  const [notificationsModalOpen, setNotificationsModalOpen] = useState(false);
+  const [manageModalOpen, setManageModalOpen] = useState(false);
+  const [notificationHistory, setNotificationHistory] = useState(() => getNotificationHistory());
   const [detailsRoutine, setDetailsRoutine] = useState<RoutineItem | null>(null);
 
   // Toast notifications
@@ -90,8 +99,10 @@ export default function App() {
       const darkActive = isDarkModeActive(state.theme);
       if (darkActive) {
         document.documentElement.classList.add('dark');
+        document.body.classList.add('dark');
       } else {
         document.documentElement.classList.remove('dark');
+        document.body.classList.remove('dark');
       }
     };
 
@@ -100,6 +111,50 @@ export default function App() {
     const timer = setInterval(applyTheme, 15000);
     return () => clearInterval(timer);
   }, [state.theme]);
+
+  // When user minimizes app, switches tabs, locks screen, and returns, ALWAYS reset to Home Screen!
+  useEffect(() => {
+    const resetToHomeScreen = () => {
+      setCurrentView('home');
+      setIsMenuOpen(false);
+      setRoutineModal({
+        isOpen: false,
+        editingRoutine: null,
+        defaultDay: selectedDay,
+        prefilledSubject: null,
+      });
+      setDetailsRoutine(null);
+      setManageModalOpen(false);
+      setNotificationsModalOpen(false);
+      setAuthModal({ isOpen: false, mode: 'login' });
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        resetToHomeScreen();
+      }
+    };
+
+    const handlePageShow = () => {
+      resetToHomeScreen();
+    };
+
+    const handleWindowFocus = () => {
+      if (document.visibilityState === 'visible') {
+        resetToHomeScreen();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('focus', handleWindowFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('focus', handleWindowFocus);
+    };
+  }, [selectedDay]);
 
   // Auto-request push notification permission on first app entry
   useEffect(() => {
@@ -144,15 +199,15 @@ export default function App() {
     }
   }, [state.routines]);
 
-
-
   // Instant 1-tap Theme Switcher
   const handleToggleTheme = () => {
     const nextMode: ThemeMode = isDark ? 'light' : 'dark';
     if (nextMode === 'dark') {
       document.documentElement.classList.add('dark');
+      document.body.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+      document.body.classList.remove('dark');
     }
 
     setState((prev) => {
@@ -170,36 +225,6 @@ export default function App() {
     showToast(nextMode === 'dark' ? 'Dark Mode Enabled 🌙' : 'Light Mode Enabled ☀️', 'info');
   };
 
-  // Instant Notification Permission Request & Toggle
-  const handleToggleNotifications = async () => {
-    if (!state.notifications.enabled) {
-      const perm = await requestNotificationPermission();
-      if (perm === 'granted') {
-        const nextNotifications = { ...state.notifications, enabled: true };
-        setState((prev) => {
-          const next = { ...prev, notifications: nextNotifications };
-          saveAppState(next);
-          return next;
-        });
-        playBellChime();
-        triggerSystemNotification('Push Notifications Active! 🔔', {
-          body: 'You will receive offline alerts when class starts and ends.',
-        });
-        showToast('Push Notifications Allowed! 🔔', 'success');
-      } else {
-        showToast('Notification permission was blocked in browser settings', 'error');
-      }
-    } else {
-      const nextNotifications = { ...state.notifications, enabled: false };
-      setState((prev) => {
-        const next = { ...prev, notifications: nextNotifications };
-        saveAppState(next);
-        return next;
-      });
-      showToast('Notifications disabled', 'info');
-    }
-  };
-
   // Track fired notifications so we don't spam within the same minute
   const firedAlertsRef = useRef<Set<string>>(new Set());
 
@@ -208,30 +233,22 @@ export default function App() {
     `${new Date().getFullYear()}-${new Date().getMonth() + 1}-${new Date().getDate()}`
   );
 
-  // Background ticker for 12:00 AM rollover & offline class start/end push notifications & bell chimes
+  // Background ticker for offline class start/end push notifications & bell chimes
   useEffect(() => {
     const checkSchedule = () => {
       const now = new Date();
       const currentDateKey = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 
-      // Midnight or Shift-End Rollover Check:
-      const targetAcademicDay = getCurrentDayName(state.shift, now);
-
+      // Midnight (12:00 AM) Rollover Check
       if (lastDateKeyRef.current !== currentDateKey) {
         lastDateKeyRef.current = currentDateKey;
+        const targetAcademicDay = getCurrentDayName(state.shift, now);
         setSelectedDay(targetAcademicDay);
         firedAlertsRef.current.clear();
-      } else {
-        // Automatic rollover to Next Day after Shift finishes (1:30 PM for Morning Shift, 6:30 PM for Day Shift)
-        const isDayShift = (state.shift || '').toLowerCase().includes('day') || (state.shift || '').toLowerCase().includes('2nd');
-        const cutoffMinutes = isDayShift ? 18 * 60 + 30 : 13 * 60 + 30;
-        const currentMinutesNow = now.getHours() * 60 + now.getMinutes();
-
-        if (currentMinutesNow >= cutoffMinutes && selectedDay !== targetAcademicDay) {
-          setSelectedDay(targetAcademicDay);
-        }
       }
 
+      // Live academic day calculation for notifications
+      const targetAcademicDay = getCurrentDayName(state.shift, now);
       const todayRoutines = state.routines.filter((r) => r.day === targetAcademicDay);
 
       if (!state.notifications.enabled) return;
@@ -249,6 +266,7 @@ export default function App() {
             firedAlertsRef.current.add(alertKey);
             if (state.notifications.notifyOnStart) {
               const startMsg = formatStartNotification(item);
+              saveNotificationRecord(startMsg, item.teacherName ? `Teacher: ${item.teacherName}` : 'Class started', item.id);
               localStorage.setItem('bteb_pending_notification_routine', item.id);
               localStorage.setItem('bteb_pending_notification_time', String(Date.now()));
               triggerSystemNotification(startMsg, {
@@ -269,10 +287,11 @@ export default function App() {
             firedAlertsRef.current.add(alertKey);
             if (state.notifications.notifyOnEnd) {
               const endMsg = formatEndNotification(item);
+              saveNotificationRecord(endMsg, 'Class concluded', item.id);
               localStorage.setItem('bteb_pending_notification_routine', item.id);
               localStorage.setItem('bteb_pending_notification_time', String(Date.now()));
               triggerSystemNotification(endMsg, {
-                body: 'Class has concluded. Break or next session!',
+                body: 'Class has concluded. Upcoming class soon!',
                 data: { routineId: item.id },
               });
               if (state.notifications.soundEnabled) {
@@ -285,9 +304,9 @@ export default function App() {
     };
 
     checkSchedule();
-    const timer = setInterval(checkSchedule, 5000);
+    const timer = setInterval(checkSchedule, 1000);
     return () => clearInterval(timer);
-  }, [state.routines, state.notifications]);
+  }, [state.routines, state.notifications, state.shift]);
 
   // Routine Handlers with immediate LocalStorage and Auth Database persistence
   const handleSaveRoutine = (savedRoutine: RoutineItem) => {
@@ -313,6 +332,17 @@ export default function App() {
       return nextState;
     });
     showToast('Class deleted from routine', 'info');
+  };
+
+  const handleBulkDeleteRoutines = (ids: string[]) => {
+    setState((prev) => {
+      const updated = prev.routines.filter((r) => !ids.includes(r.id));
+      const nextState = { ...prev, routines: updated };
+      saveAppState(nextState);
+      syncCurrentAccount(updated, nextState);
+      return nextState;
+    });
+    showToast(`${ids.length} classes deleted`, 'info');
   };
 
   const handleUpdateAppState = (updated: Partial<AppState>) => {
@@ -360,31 +390,80 @@ export default function App() {
     showToast('Logged out of account', 'info');
   };
 
-  const handleSelectBtebSubject = (subject: { code: string; name: string }) => {
-    setRoutineModal({
-      isOpen: true,
-      editingRoutine: null,
-      defaultDay: selectedDay,
-      prefilledSubject: subject,
-    });
-  };
+  const todayAcademicDay = getCurrentDayName(state.shift, new Date());
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased overflow-x-hidden transition-colors relative">
       {/* Dynamic Department Themed Ambient Background */}
       <DepartmentBackground departmentName={state.departmentName} />
 
-      {/* Top Header with Hamburger Menu and Search Bar */}
-      <Header
-        onOpenMenu={() => setIsMenuOpen(true)}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-      />
+      {/* FIXED / STICKY TOP ZONE: Header + LiveClassBar + 5 Day Tabs
+          Pinned at top so routine cards scroll smoothly underneath without hiding the dashboard */}
+      <div className="sticky top-0 z-30 bg-slate-50/95 dark:bg-slate-950/70 backdrop-blur-3xl border-b border-zinc-200/70 dark:border-white/10 shadow-xs dark:shadow-[0_8px_32px_rgba(0,0,0,0.36)] transition-all">
+        {/* Top Header */}
+        <Header
+          onOpenMenu={() => setIsMenuOpen(true)}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          currentView={currentView}
+          onNavigateHome={() => setCurrentView('home')}
+        />
+
+        {/* When in Home View: Fixed Live Status Bar & Day Selector Tabs */}
+        {currentView === 'home' && (
+          <div className="max-w-5xl mx-auto px-3 sm:px-5 pt-1 pb-2 space-y-2">
+            {/* Live Class Bar */}
+            <LiveClassBar routines={state.routines} />
+
+            {/* Day Selector Tabs (Sunday to Thursday) - Stays Fixed at Top */}
+            {!searchQuery.trim() && (
+              <div className="bg-white/85 dark:bg-slate-900/50 backdrop-blur-2xl rounded-2xl p-1.5 border border-zinc-200/80 dark:border-white/10 shadow-2xs dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.12),0_8px_24px_rgba(0,0,0,0.3)] transition-all">
+                <div className="grid grid-cols-5 gap-1 sm:gap-1.5">
+                  {DAYS_OF_WEEK.map((day) => {
+                    const count = state.routines.filter((r) => r.day === day).length;
+                    const isSelected = selectedDay === day;
+                    const isToday = todayAcademicDay === day;
+
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => setSelectedDay(day)}
+                        className={`py-1.5 px-1 rounded-xl transition-all text-center select-none cursor-pointer ${
+                          isSelected
+                            ? 'bg-emerald-600 text-white shadow-xs font-bold dark:shadow-[0_2px_12px_rgba(16,185,129,0.35)]'
+                            : 'text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/[0.06] font-medium'
+                        }`}
+                      >
+                        <div className="flex items-center justify-center gap-1 text-xs sm:text-sm">
+                          <span>{day.slice(0, 3)}</span>
+                          {isToday && (
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${
+                                isSelected ? 'bg-white' : 'bg-emerald-500'
+                              } animate-pulse`}
+                            />
+                          )}
+                        </div>
+                        <div className="text-[10px] mt-0.5 opacity-85 font-mono tracking-tight">
+                          {count} cls
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Left Sidebar Menu Drawer */}
       <LeftMenu
         isOpen={isMenuOpen}
         onClose={() => setIsMenuOpen(false)}
+        currentView={currentView}
+        onNavigateHome={() => setCurrentView('home')}
         onOpenAddClass={() =>
           setRoutineModal({
             isOpen: true,
@@ -393,39 +472,65 @@ export default function App() {
             prefilledSubject: null,
           })
         }
-        onOpenBtebHub={() => setBtebModalOpen(true)}
-        onOpenSettings={() => setSettingsModalOpen(true)}
+        onOpenManageRoutines={() => setManageModalOpen(true)}
+        onOpenBtebHub={() => setCurrentView('bteb')}
+        onOpenSettings={() => setCurrentView('settings')}
+        onOpenNotifications={() => {
+          setNotificationHistory(getNotificationHistory());
+          setNotificationsModalOpen(true);
+        }}
         currentUser={currentUser}
         onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode: mode || 'login' })}
         onLogout={handleLogout}
       />
 
-      {/* Main Content Area */}
+      {/* Main Content Area (Scrolls Underneath the Fixed Top Zone) */}
       <main className="flex-1 max-w-5xl w-full mx-auto px-3 sm:px-5 py-3 sm:py-4 space-y-4 relative z-10">
-        {/* Real-Time Live Status Bar (No "Live" text) */}
-        <LiveClassBar routines={state.routines} />
+        {currentView === 'home' && (
+          <RoutineView
+            routines={state.routines}
+            selectedDay={selectedDay}
+            onChangeDay={setSelectedDay}
+            onOpenEditRoutine={(routine) =>
+              setRoutineModal({
+                isOpen: true,
+                editingRoutine: routine,
+                defaultDay: routine.day,
+                prefilledSubject: null,
+              })
+            }
+            onDeleteRoutine={handleDeleteRoutine}
+            searchQuery={searchQuery}
+            onClearSearch={() => setSearchQuery('')}
+            onSelectRoutine={(routine) => setDetailsRoutine(routine)}
+            hideDayTabs={true}
+          />
+        )}
 
-        {/* Clear, Pure Routine Schedule View */}
-        <RoutineView
-          routines={state.routines}
-          selectedDay={selectedDay}
-          onChangeDay={setSelectedDay}
-          onOpenEditRoutine={(routine) =>
-            setRoutineModal({
-              isOpen: true,
-              editingRoutine: routine,
-              defaultDay: routine.day,
-              prefilledSubject: null,
-            })
-          }
-          onDeleteRoutine={handleDeleteRoutine}
-          searchQuery={searchQuery}
-          onClearSearch={() => setSearchQuery('')}
-          onSelectRoutine={(routine) => setDetailsRoutine(routine)}
-        />
+        {/* Integrated BTEB Book List View (Pure Book Viewing, English-only, in-app view) */}
+        {currentView === 'bteb' && (
+          <BtebBooklistView
+            onBackToHome={() => setCurrentView('home')}
+            initialDeptSlug={state.departmentSlug}
+            initialSemester={state.semester}
+          />
+        )}
+
+        {/* Integrated Settings View (In-App View, English-only, NO popup) */}
+        {currentView === 'settings' && (
+          <ScheduleSettingsView
+            onBackToHome={() => setCurrentView('home')}
+            state={state}
+            onUpdateState={handleUpdateAppState}
+            onResetRoutines={handleResetRoutines}
+            currentUser={currentUser}
+            onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode: mode || 'login' })}
+            onLogout={handleLogout}
+          />
+        )}
       </main>
 
-      {/* Routine Add / Edit Modal with Android DeskClock Time Picker */}
+      {/* Routine Add / Edit Modal with Unique Custom Pickers (No default HTML selects) */}
       {routineModal.isOpen && (
         <RoutineModal
           isOpen={routineModal.isOpen}
@@ -468,29 +573,6 @@ export default function App() {
         />
       )}
 
-      {/* BTEB Booklist Hub Modal */}
-      {btebModalOpen && (
-        <BtebBooklistModal
-          isOpen={btebModalOpen}
-          onClose={() => setBtebModalOpen(false)}
-          onSelectSubjectForRoutine={handleSelectBtebSubject}
-        />
-      )}
-
-      {/* Settings Modal */}
-      {settingsModalOpen && (
-        <ScheduleSettingsModal
-          isOpen={settingsModalOpen}
-          onClose={() => setSettingsModalOpen(false)}
-          state={state}
-          onUpdateState={handleUpdateAppState}
-          onResetRoutines={handleResetRoutines}
-          currentUser={currentUser}
-          onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode: mode || 'login' })}
-          onLogout={handleLogout}
-        />
-      )}
-
       {/* Passwordless Biometric Fingerprint Auth Modal */}
       {authModal.isOpen && (
         <BiometricAuthModal
@@ -500,6 +582,31 @@ export default function App() {
           onLoginSuccess={handleLoginSuccess}
           currentRoutines={state.routines}
           appState={state}
+        />
+      )}
+
+      {/* Notification History Modal */}
+      {notificationsModalOpen && (
+        <NotificationHistoryModal
+          isOpen={notificationsModalOpen}
+          onClose={() => setNotificationsModalOpen(false)}
+          notifications={notificationHistory}
+          onClearHistory={() => {
+            clearNotificationHistory();
+            setNotificationHistory([]);
+            showToast('Notification history cleared', 'info');
+          }}
+        />
+      )}
+
+      {/* Manage & Bulk Delete Routines Modal */}
+      {manageModalOpen && (
+        <ManageRoutinesModal
+          isOpen={manageModalOpen}
+          onClose={() => setManageModalOpen(false)}
+          routines={state.routines}
+          onDeleteRoutines={handleBulkDeleteRoutines}
+          onResetAllRoutines={handleResetRoutines}
         />
       )}
 

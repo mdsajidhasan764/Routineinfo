@@ -39,7 +39,7 @@ export interface NotificationSettings {
   advanceMinutes: number;
 }
 
-export type ThemeMode = 'light' | 'dark' | 'schedule';
+export type ThemeMode = 'light' | 'dark' | 'glass' | 'schedule';
 
 export interface ThemeSettings {
   mode: ThemeMode;

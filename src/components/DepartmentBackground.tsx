@@ -4,95 +4,45 @@ interface DepartmentBackgroundProps {
   departmentName?: string;
 }
 
-export const DepartmentBackground: React.FC<DepartmentBackgroundProps> = ({
-  departmentName = 'Computer Science & Technology',
-}) => {
-  const deptLower = (departmentName || '').toLowerCase();
-
-  const isComputer =
-    deptLower.includes('computer') ||
-    deptLower.includes('cst') ||
-    deptLower.includes('software') ||
-    deptLower.includes('data');
-
-  const isElectrical =
-    deptLower.includes('electrical') ||
-    deptLower.includes('electronics') ||
-    deptLower.includes('et') ||
-    deptLower.includes('telecommunication');
-
-  const isCivil =
-    deptLower.includes('civil') ||
-    deptLower.includes('architecture') ||
-    deptLower.includes('construction');
-
-  const isMechanical =
-    deptLower.includes('mechanical') ||
-    deptLower.includes('automobile') ||
-    deptLower.includes('power') ||
-    deptLower.includes('rac') ||
-    deptLower.includes('mechatronics');
-
-  // Modern atmospheric color palette based on department
-  const ambientColors = isComputer
-    ? {
-        primary: 'rgba(16, 185, 129, 0.12)', // Emerald
-        secondary: 'rgba(20, 184, 166, 0.08)', // Teal
-        accent: 'rgba(52, 211, 153, 0.05)',
-      }
-    : isElectrical
-    ? {
-        primary: 'rgba(59, 130, 246, 0.12)', // Blue
-        secondary: 'rgba(99, 102, 241, 0.08)', // Indigo
-        accent: 'rgba(147, 197, 253, 0.05)',
-      }
-    : isCivil
-    ? {
-        primary: 'rgba(6, 182, 212, 0.12)', // Cyan
-        secondary: 'rgba(2, 132, 199, 0.08)', // Sky
-        accent: 'rgba(103, 232, 249, 0.05)',
-      }
-    : isMechanical
-    ? {
-        primary: 'rgba(245, 158, 11, 0.12)', // Amber
-        secondary: 'rgba(249, 115, 22, 0.08)', // Orange
-        accent: 'rgba(252, 211, 77, 0.05)',
-      }
-    : {
-        primary: 'rgba(16, 185, 129, 0.10)',
-        secondary: 'rgba(59, 130, 246, 0.08)',
-        accent: 'rgba(148, 163, 184, 0.05)',
-      };
-
+export const DepartmentBackground: React.FC<DepartmentBackgroundProps> = () => {
   return (
     <div
       aria-hidden="true"
       className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none"
     >
-      {/* Ultra-subtle modern dot grid */}
+      {/* Subtle Dot Grid */}
       <div
-        className="absolute inset-0 opacity-[0.25] dark:opacity-[0.18]"
+        className="absolute inset-0 opacity-[0.20] dark:opacity-[0.08]"
         style={{
           backgroundImage: `radial-gradient(currentColor 1px, transparent 1px)`,
           backgroundSize: '24px 24px',
-          color: 'var(--grid-color, rgba(148, 163, 184, 0.4))',
+          color: 'rgba(148, 163, 184, 0.4)',
         }}
       />
 
-      {/* Modern Ambient Mesh Light Blobs - Zero Text, Pure Sleek Aesthetics */}
+      {/* Dark Mode Luminous Mesh Orbs for authentic frosted glass refraction */}
+      {/* Top Left: Deep Emerald Glow */}
       <div
-        className="absolute -top-32 -left-32 w-96 h-96 sm:w-[500px] sm:h-[500px] rounded-full blur-[100px] sm:blur-[130px] transition-all duration-700"
-        style={{ backgroundColor: ambientColors.primary }}
+        className="absolute -top-36 -left-32 w-96 h-96 sm:w-[580px] sm:h-[580px] rounded-full blur-[110px] sm:blur-[140px] opacity-70 dark:opacity-85 pointer-events-none transition-all duration-700"
+        style={{ backgroundColor: 'rgba(16, 185, 129, 0.22)' }}
       />
 
+      {/* Top Right: Electric Cyan & Deep Teal Glow */}
       <div
-        className="absolute top-1/3 -right-32 w-80 h-80 sm:w-[450px] sm:h-[450px] rounded-full blur-[100px] sm:blur-[140px] transition-all duration-700"
-        style={{ backgroundColor: ambientColors.secondary }}
+        className="absolute top-1/4 -right-32 w-80 h-80 sm:w-[520px] sm:h-[520px] rounded-full blur-[110px] sm:blur-[150px] opacity-60 dark:opacity-75 pointer-events-none transition-all duration-700"
+        style={{ backgroundColor: 'rgba(20, 184, 166, 0.20)' }}
       />
 
+      {/* Center Left: Subtle Deep Indigo / Slate Accent */}
       <div
-        className="absolute -bottom-32 left-1/4 w-80 h-80 sm:w-[500px] sm:h-[500px] rounded-full blur-[110px] sm:blur-[150px] transition-all duration-700"
-        style={{ backgroundColor: ambientColors.accent }}
+        className="absolute top-2/3 -left-20 w-80 h-80 sm:w-[460px] sm:h-[460px] rounded-full blur-[120px] sm:blur-[160px] opacity-40 dark:opacity-65 pointer-events-none transition-all duration-700"
+        style={{ backgroundColor: 'rgba(14, 165, 233, 0.16)' }}
+      />
+
+      {/* Bottom Center: Luminous Emerald Depth */}
+      <div
+        className="absolute -bottom-40 left-1/3 w-96 h-96 sm:w-[560px] sm:h-[560px] rounded-full blur-[120px] sm:blur-[160px] opacity-50 dark:opacity-70 pointer-events-none transition-all duration-700"
+        style={{ backgroundColor: 'rgba(5, 150, 105, 0.18)' }}
       />
     </div>
   );

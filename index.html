@@ -36,8 +36,30 @@
         }
       }, true);
     </script>
+    <script>
+      (function() {
+        try {
+          var raw = localStorage.getItem('bteb_routine_app_v1') || localStorage.getItem('bteb_routine_app_state');
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            var mode = parsed && parsed.theme && parsed.theme.mode;
+            if (mode === 'dark' || mode === 'glass') {
+              document.documentElement.classList.add('dark');
+            } else if (mode === 'light') {
+              document.documentElement.classList.remove('dark');
+            } else if (mode === 'schedule') {
+              var now = new Date();
+              var cur = now.getHours() * 60 + now.getMinutes();
+              if (cur >= 19 * 60 || cur < 6 * 60) {
+                document.documentElement.classList.add('dark');
+              }
+            }
+          }
+        } catch(e) {}
+      })();
+    </script>
   </head>
-  <body class="bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white min-h-screen">
+  <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 antialiased selection:bg-emerald-500 selection:text-white min-h-screen transition-colors">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

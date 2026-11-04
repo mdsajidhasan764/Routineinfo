@@ -302,11 +302,11 @@ export const ClockTimePickerModal: React.FC<ClockTimePickerModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/90 backdrop-blur-md animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 dark:bg-black/85 backdrop-blur-md animate-in fade-in"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-sm bg-[#111418] text-white rounded-[32px] shadow-2xl overflow-hidden border border-neutral-800 flex flex-col select-none"
+        className="relative w-full max-w-sm bg-slate-950/85 backdrop-blur-3xl text-white rounded-[32px] shadow-2xl overflow-hidden border border-white/15 shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_24px_64px_rgba(0,0,0,0.7)] flex flex-col select-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Department Background Inside The Clock Screen */}

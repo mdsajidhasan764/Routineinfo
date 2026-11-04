@@ -45,26 +45,10 @@ export function formatMinutesToTime(totalMinutes: number): string {
 
 export function getCurrentDayName(shift: string = 'Morning Shift', now: Date = new Date()): DayOfWeek {
   const dayIndex = now.getDay(); // 0 is Sunday, 1 Monday ... 4 Thursday, 5 Friday, 6 Saturday
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  // Shift Cutoffs:
-  // Morning Shift: 08:00 AM - 01:30 PM (cutoff: 1:30 PM = 810 mins)
-  // Day Shift:     12:30 PM - 06:30 PM (cutoff: 6:30 PM = 1110 mins)
-  const isDayShift = (shift || '').toLowerCase().includes('day') || (shift || '').toLowerCase().includes('2nd');
-  const cutoffMinutes = isDayShift ? 18 * 60 + 30 : 13 * 60 + 30;
-
-  // Weekend (Friday or Saturday) always rolls over to Sunday
+  // Weekend (Friday or Saturday) rolls over to Sunday (the upcoming school day)
   if (dayIndex === 5 || dayIndex === 6) {
     return 'Sunday';
-  }
-
-  // If past today's shift cutoff, automatically advance to next academic day!
-  if (currentMinutes >= cutoffMinutes) {
-    if (dayIndex === 0) return 'Monday';      // Sunday evening -> Monday
-    if (dayIndex === 1) return 'Tuesday';     // Monday evening -> Tuesday
-    if (dayIndex === 2) return 'Wednesday';   // Tuesday evening -> Wednesday
-    if (dayIndex === 3) return 'Thursday';    // Wednesday evening -> Thursday
-    if (dayIndex === 4) return 'Sunday';      // Thursday evening -> Sunday (next week)
   }
 
   const map: Record<number, DayOfWeek> = {
@@ -138,29 +122,77 @@ export async function requestNotificationPermission(): Promise<NotificationPermi
 }
 
 /**
- * Builds class start notification title matching exact user template:
- * "Computer Office Application - Start At 4:15PM - Network Lab."
+ * Builds class start notification title matching user template:
+ * "Computer Office Application Class Started At 4:15 - Networking Lab"
  */
 export function formatStartNotification(item: RoutineItem): string {
   const roomPart = item.room ? ` - ${item.room}` : '';
-  return `${item.subjectName} - Start At ${item.startTime}${roomPart}.`;
+  return `${item.subjectName} Class Started At ${item.startTime}${roomPart}`;
 }
 
 /**
- * Builds class end notification title matching exact user template:
- * "Computer Office Application - Ended At 5:00PM - Network Lab."
+ * Builds class end notification title matching user template:
+ * "Computer Office Application Class Ended At 5:00 - Network Lab"
  */
 export function formatEndNotification(item: RoutineItem): string {
   const roomPart = item.room ? ` - ${item.room}` : '';
-  return `${item.subjectName} - Ended At ${item.endTime}${roomPart}.`;
+  return `${item.subjectName} Class Ended At ${item.endTime}${roomPart}`;
+}
+
+export interface NotificationHistoryItem {
+  id: string;
+  title: string;
+  body: string;
+  timestamp: number;
+  routineId?: string;
+}
+
+const NOTIFICATION_HISTORY_KEY = 'bteb_notification_history';
+
+export function getNotificationHistory(): NotificationHistoryItem[] {
+  try {
+    const raw = localStorage.getItem(NOTIFICATION_HISTORY_KEY);
+    if (!raw) return [];
+    const list: NotificationHistoryItem[] = JSON.parse(raw);
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    return list.filter((item) => now - item.timestamp <= sevenDaysMs);
+  } catch {
+    return [];
+  }
+}
+
+export function saveNotificationRecord(title: string, body: string, routineId?: string): NotificationHistoryItem[] {
+  try {
+    const history = getNotificationHistory();
+    const newItem: NotificationHistoryItem = {
+      id: `notif_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      title,
+      body,
+      timestamp: Date.now(),
+      routineId,
+    };
+    const updated = [newItem, ...history];
+    const now = Date.now();
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    const filtered = updated.filter((item) => now - item.timestamp <= sevenDaysMs);
+    localStorage.setItem(NOTIFICATION_HISTORY_KEY, JSON.stringify(filtered));
+    return filtered;
+  } catch {
+    return [];
+  }
+}
+
+export function clearNotificationHistory(): void {
+  localStorage.removeItem(NOTIFICATION_HISTORY_KEY);
 }
 
 /**
  * Evaluates whether dark mode should be enabled based on user preference or schedule
  */
-export function isDarkModeActive(theme?: { mode: 'light' | 'dark' | 'schedule'; scheduleStart?: string; scheduleEnd?: string }): boolean {
+export function isDarkModeActive(theme?: { mode: 'light' | 'dark' | 'glass' | 'schedule'; scheduleStart?: string; scheduleEnd?: string }): boolean {
   if (!theme || theme.mode === 'light') return false;
-  if (theme.mode === 'dark') return true;
+  if (theme.mode === 'dark' || theme.mode === 'glass') return true;
   if (theme.mode === 'schedule') {
     const now = new Date();
     const currentMin = now.getHours() * 60 + now.getMinutes();

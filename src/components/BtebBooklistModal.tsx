@@ -128,9 +128,9 @@ export const BtebBooklistModal: React.FC<BtebBooklistModalProps> = ({
               No books found for this semester.
             </div>
           ) : (
-            semesterBooks.map((book) => (
+            semesterBooks.map((book, idx) => (
               <div
-                key={book.code}
+                key={`${book.code}-${idx}`}
                 className="p-3 bg-white rounded-xl border border-slate-200 flex items-center justify-between gap-3 hover:border-slate-300 transition"
               >
                 <div className="min-w-0 flex-1">

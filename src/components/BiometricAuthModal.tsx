@@ -144,15 +144,15 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 dark:bg-black/80 backdrop-blur-md animate-in fade-in"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-sm bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 rounded-3xl shadow-2xl overflow-hidden border border-zinc-200/80 dark:border-zinc-800 flex flex-col transition-all"
+        className="w-full max-w-sm bg-white dark:bg-slate-950/85 dark:backdrop-blur-3xl text-zinc-900 dark:text-zinc-100 rounded-3xl shadow-2xl overflow-hidden border border-zinc-200/80 dark:border-white/15 dark:shadow-[inset_0_1px_1px_rgba(255,255,255,0.18),0_24px_64px_rgba(0,0,0,0.6)] flex flex-col transition-all"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-4 border-b border-zinc-200/80 dark:border-zinc-800/80 flex items-center justify-between bg-zinc-50 dark:bg-zinc-950">
+        <div className="p-4 border-b border-zinc-200/80 dark:border-white/[0.08] flex items-center justify-between bg-zinc-50 dark:bg-white/[0.04] dark:backdrop-blur-md">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <Fingerprint className="w-5 h-5 stroke-[2.2]" />
@@ -165,15 +165,15 @@ export const BiometricAuthModal: React.FC<BiometricAuthModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-zinc-800 transition cursor-pointer"
+            className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-white/[0.08] transition cursor-pointer"
           >
             <X className="w-5 h-5 stroke-[2]" />
           </button>
         </div>
 
         {/* Tab Switcher: Login vs Register */}
-        <div className="p-3 bg-zinc-100/60 dark:bg-zinc-900 border-b border-zinc-200/60 dark:border-zinc-800/60">
-          <div className="grid grid-cols-2 gap-1 bg-zinc-200/60 dark:bg-zinc-800/80 p-1 rounded-xl">
+        <div className="p-3 bg-zinc-100/60 dark:bg-white/[0.02] border-b border-zinc-200/60 dark:border-white/[0.08]">
+          <div className="grid grid-cols-2 gap-1 bg-zinc-200/60 dark:bg-white/[0.05] p-1 rounded-xl border border-transparent dark:border-white/10">
             <button
               type="button"
               onClick={() => {

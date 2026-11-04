@@ -138,7 +138,49 @@ export const ScheduleSettingsModal: React.FC<ScheduleSettingsModalProps> = ({
 
         {/* Content Area - STRICTLY Finger Login & Push Notifications ONLY */}
         <div className="p-4 sm:p-5 space-y-4 overflow-y-auto max-h-[80vh] text-xs">
-          {/* Section 1: Account & Biometric Security */}
+          {/* Section 1: Theme Options */}
+          <div className="space-y-2">
+            <span className="font-extrabold uppercase text-[11px] tracking-wider text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+              <span>App Theme Mode</span>
+            </span>
+            <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <button
+                type="button"
+                onClick={() => onUpdateState({ theme: { ...state.theme, mode: 'light' } })}
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                  state.theme.mode === 'light'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span>☀️ Light</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateState({ theme: { ...state.theme, mode: 'dark' } })}
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                  state.theme.mode === 'dark' || (state.theme.mode as string) === 'glass'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span>🌙 Dark</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => onUpdateState({ theme: { ...state.theme, mode: 'schedule' } })}
+                className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer ${
+                  state.theme.mode === 'schedule'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                <span>🕒 Auto Night</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Section 2: Account & Biometric Security */}
           <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-teal-500/5 dark:from-emerald-950/40 dark:to-slate-900 border border-emerald-500/20 dark:border-emerald-800/40">
             <div className="flex items-center justify-between mb-2">
               <span className="font-extrabold uppercase text-[11px] tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">

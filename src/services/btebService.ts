@@ -34,7 +34,7 @@ export function determineSubjectCategory(code: string, name: string): SubjectCat
     lowerName.includes('industrial attachment') ||
     lowerName.includes('presentation')
   ) {
-    return 'ডিপার্টমেন্টাল • প্রজেক্ট';
+    return 'Departmental · Project';
   }
 
   if (
@@ -43,7 +43,7 @@ export function determineSubjectCategory(code: string, name: string): SubjectCat
     lowerName.includes('laboratory') ||
     lowerName.includes('lab')
   ) {
-    return 'প্রজেক্ট / প্র্যাকটিক্যাল';
+    return 'Project / Practical';
   }
 
   if (
@@ -58,7 +58,7 @@ export function determineSubjectCategory(code: string, name: string): SubjectCat
     lowerName.includes('physical education') ||
     lowerName.includes('business')
   ) {
-    return 'নন-ডিপার্টমেন্টাল • নন-টেকনিক্যাল';
+    return 'Non-Departmental';
   }
 
   if (
@@ -69,21 +69,20 @@ export function determineSubjectCategory(code: string, name: string): SubjectCat
     lowerName.includes('mechanics') ||
     lowerName.includes('environmental')
   ) {
-    return 'টেকনিক্যাল • ভিত্তিমূলক';
+    return 'Technical · Foundation';
   }
 
-  return 'ডিপার্টমেন্টাল • টেকনিক্যাল';
+  return 'Departmental · Technical';
 }
 
 export function convertBtebToSubjects(items: BtebSubjectItem[]): Subject[] {
-  return items.map((item, idx) => {
+  return items.map((item) => {
     const category = determineSubjectCategory(item.code, item.name);
-    // Starter initial syllabus chapters for student guidance
     const starterChapters: Chapter[] = [
-      { id: uid('ch'), name: '১. অধ্যায় ১ — ভূমিকা ও মৌলিক ধারণা', done: false, priority: 'high' },
-      { id: uid('ch'), name: '২. অধ্যায় ২ — মূল থিওরি ও সমীকরণ', done: false, priority: 'high' },
-      { id: uid('ch'), name: '৩. অধ্যায় ৩ — গাণিতিক সমস্যা ও উদাহরণ', done: false, priority: 'medium' },
-      { id: uid('ch'), name: '৪. অধ্যায় ৪ — প্র্যাকটিক্যাল ও বোর্ড প্রশ্ন সমাধান', done: false, priority: 'medium' },
+      { id: uid('ch'), name: '1. Chapter 1 — Fundamentals & Introduction', done: false, priority: 'high' },
+      { id: uid('ch'), name: '2. Chapter 2 — Core Concepts & Theories', done: false, priority: 'high' },
+      { id: uid('ch'), name: '3. Chapter 3 — Problem Solving & Examples', done: false, priority: 'medium' },
+      { id: uid('ch'), name: '4. Chapter 4 — Practical & Board Questions', done: false, priority: 'medium' },
     ];
 
     return {
