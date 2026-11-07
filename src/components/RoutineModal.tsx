@@ -19,6 +19,7 @@ import { uid, cleanTitle } from '../utils/storage';
 import { getAllDepartments, BtebSubjectItem } from '../services/btebService';
 import { ClockTimePickerModal } from './ClockTimePickerModal';
 import { parseTimeToMinutes, formatMinutesToTime } from '../utils/notificationService';
+import { getInitialTeachers, TeacherRecord } from '../services/jashoreTeacherService';
 
 interface RoutineModalProps {
   isOpen: boolean;
@@ -78,7 +79,12 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
   const [teacherPhone, setTeacherPhone] = useState('');
   const [note, setNote] = useState('');
 
-  // Load saved teacher directory from localStorage
+  // Load saved teacher directory from localStorage & official 84 faculty records
+  const [showTeacherSuggestions, setShowTeacherSuggestions] = useState(false);
+  const facultyDirectory = useMemo<TeacherRecord[]>(() => {
+    return getInitialTeachers();
+  }, [isOpen]);
+
   const savedTeachers = useMemo(() => {
     try {
       const raw = localStorage.getItem('bteb_teacher_directory');
@@ -90,10 +96,24 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
 
   const handleTeacherNameChange = (name: string) => {
     setTeacherName(name);
-    const trimmed = name.trim();
-    if (savedTeachers[trimmed]) {
-      setTeacherPhone(savedTeachers[trimmed]);
+    setShowTeacherSuggestions(true);
+    const trimmed = name.trim().toLowerCase();
+    if (trimmed.length > 0) {
+      const exact = facultyDirectory.find(
+        (t) => (t.nameEn || '').toLowerCase() === trimmed || (t.name || '').toLowerCase() === trimmed
+      );
+      if (exact && exact.phone) {
+        setTeacherPhone(exact.phone);
+      } else if (savedTeachers[name.trim()]) {
+        setTeacherPhone(savedTeachers[name.trim()]);
+      }
     }
+  };
+
+  const handleSelectTeacher = (teacher: { nameEn: string; phone: string }) => {
+    setTeacherName(teacher.nameEn);
+    setTeacherPhone(teacher.phone);
+    setShowTeacherSuggestions(false);
   };
 
   const applyDuration = (minutesToAdd: number) => {
@@ -107,10 +127,59 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
   const matchingTeachers = useMemo(() => {
     const q = teacherName.trim().toLowerCase();
     if (q.length < 1) return [];
-    return Object.entries(savedTeachers).filter(([name]) =>
-      name.toLowerCase().includes(q)
-    );
-  }, [teacherName, savedTeachers]);
+
+    // Filter faculty directory by name, department, or designation
+    const fromFaculty = facultyDirectory.filter((t) => {
+      const nameEn = (t.nameEn || '').toLowerCase();
+      const nameBn = (t.nameBn || t.name || '').toLowerCase();
+      const deptEn = (t.departmentEn || '').toLowerCase();
+      const desEn = (t.designationEn || '').toLowerCase();
+      return (
+        nameEn.includes(q) ||
+        nameBn.includes(q) ||
+        desEn.includes(q) ||
+        deptEn.includes(q)
+      );
+    });
+
+    // Also include saved custom teachers
+    const fromSaved: TeacherRecord[] = Object.entries(savedTeachers)
+      .filter(([name]) => name.toLowerCase().includes(q))
+      .map(([name, phone]) => ({
+        id: `saved_${name}`,
+        sl: 999,
+        name,
+        nameEn: name,
+        nameBn: name,
+        designation: 'Faculty',
+        designationEn: 'Faculty',
+        designationBn: 'Faculty',
+        department: 'Saved Teachers',
+        departmentEn: 'Saved Teachers',
+        departmentBn: 'Saved Teachers',
+        deptCategory: 'other',
+        phone,
+        email: '',
+        photoUrl: '',
+        sourceUrl: '',
+      }));
+
+    const combined = [...fromFaculty];
+    for (const s of fromSaved) {
+      if (!combined.some((c) => (c.nameEn || '').toLowerCase() === s.nameEn.toLowerCase())) {
+        combined.push(s);
+      }
+    }
+
+    // Sort: records where nameEn begins with query string rank first
+    return combined
+      .sort((a, b) => {
+        const aStarts = (a.nameEn || '').toLowerCase().startsWith(q) ? 1 : 0;
+        const bStarts = (b.nameEn || '').toLowerCase().startsWith(q) ? 1 : 0;
+        return bStarts - aStarts;
+      })
+      .slice(0, 12);
+  }, [teacherName, facultyDirectory, savedTeachers]);
 
   // Clock screen time picker state
   const [clockPickerTarget, setClockPickerTarget] = useState<'start' | 'end' | null>(null);
@@ -551,9 +620,12 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
 
             {/* Teacher Details */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-                  Teacher's Name
+              <div className="relative">
+                <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1 flex items-center justify-between">
+                  <span>Teacher's Name</span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
+                    Auto-fill on 1-2 letters
+                  </span>
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -561,22 +633,54 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
                     type="text"
                     value={teacherName}
                     onChange={(e) => handleTeacherNameChange(e.target.value)}
-                    placeholder="e.g. Sajid Islam"
+                    onFocus={() => {
+                      if (teacherName.trim().length >= 1) {
+                        setShowTeacherSuggestions(true);
+                      }
+                    }}
+                    placeholder="e.g. Md, Sheikh, Rabiul..."
                     className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white focus:outline-emerald-500"
                   />
-                  {matchingTeachers.length > 0 && teacherName.trim().length > 0 && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl shadow-xl z-50 overflow-hidden max-h-44 overflow-y-auto">
-                      {matchingTeachers.map(([name, phone]) => (
+                  {showTeacherSuggestions && matchingTeachers.length > 0 && teacherName.trim().length >= 1 && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white dark:bg-slate-900 border border-emerald-500/30 dark:border-white/15 rounded-2xl shadow-2xl z-50 overflow-hidden max-h-60 overflow-y-auto divide-y divide-zinc-100 dark:divide-zinc-800">
+                      <div className="px-3 py-1.5 bg-emerald-50/90 dark:bg-emerald-950/60 text-[10px] font-bold text-emerald-800 dark:text-emerald-300 flex items-center justify-between border-b border-emerald-200/50 dark:border-emerald-800/50">
+                        <span>Faculty Suggestions ({matchingTeachers.length})</span>
+                        <span className="text-[9px] uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Click to fill</span>
+                      </div>
+                      {matchingTeachers.map((t) => (
                         <div
-                          key={name}
-                          onClick={() => {
-                            setTeacherName(name);
-                            setTeacherPhone(phone);
+                          key={t.id || t.nameEn}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectTeacher({ nameEn: t.nameEn, phone: t.phone });
                           }}
-                          className="px-3 py-2.5 text-xs hover:bg-emerald-50 dark:hover:bg-emerald-950/60 cursor-pointer flex items-center justify-between text-zinc-800 dark:text-zinc-200 border-b border-zinc-100 dark:border-zinc-700/50 last:border-none"
+                          className="p-2.5 hover:bg-emerald-50 dark:hover:bg-emerald-950/60 cursor-pointer flex items-center gap-2.5 transition text-zinc-800 dark:text-zinc-200 group"
                         >
-                          <span className="font-bold">{name}</span>
-                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">{phone}</span>
+                          {t.photoUrl ? (
+                            <img
+                              src={t.photoUrl}
+                              alt={t.nameEn}
+                              className="w-8 h-8 rounded-xl object-cover shrink-0 border border-zinc-200 dark:border-white/10"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 flex items-center justify-center shrink-0 font-bold text-xs">
+                              <User className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-xs text-zinc-900 dark:text-white truncate group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                              {t.nameEn}
+                            </div>
+                            <div className="text-[10px] text-zinc-500 dark:text-zinc-400 truncate">
+                              {t.departmentEn || t.designationEn || 'Faculty'}
+                            </div>
+                          </div>
+                          <div className="font-mono text-[11px] text-emerald-700 dark:text-emerald-400 font-bold shrink-0 bg-emerald-100/70 dark:bg-emerald-950/80 px-2 py-0.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60">
+                            {t.phone}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -586,7 +690,7 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
 
               <div>
                 <label className="block text-xs font-bold text-zinc-700 dark:text-zinc-300 mb-1">
-                  Teacher's Phone
+                  Teacher's Mobile Phone
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -594,7 +698,7 @@ export const RoutineModal: React.FC<RoutineModalProps> = ({
                     type="tel"
                     value={teacherPhone}
                     onChange={(e) => setTeacherPhone(e.target.value)}
-                    placeholder="017XXXXXXXX"
+                    placeholder="01XXXXXXXXX"
                     className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm rounded-xl border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-white font-mono focus:outline-emerald-500"
                   />
                 </div>

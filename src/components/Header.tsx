@@ -5,8 +5,10 @@ interface HeaderProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   onOpenMenu?: () => void;
-  currentView?: 'home' | 'bteb' | 'settings';
+  currentView?: 'home' | 'bteb' | 'settings' | 'teachers';
   onNavigateHome?: () => void;
+  currentUser?: any;
+  onOpenAuth?: (mode?: 'login' | 'register') => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -15,6 +17,8 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenMenu,
   currentView = 'home',
   onNavigateHome,
+  currentUser,
+  onOpenAuth,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-white/80 dark:bg-zinc-950/85 backdrop-blur-3xl border-b border-zinc-200/60 dark:border-zinc-800/80 transition-colors">
@@ -57,15 +61,17 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'BTEB Books'
                 : currentView === 'settings'
                 ? 'Settings'
+                : currentView === 'teachers'
+                ? 'Teacher List'
                 : 'Routine Info'}
             </h1>
           </div>
         </div>
 
-        {/* Right Side: Search (Only on Home screen) */}
+        {/* Right Side: Search & User Account Profile */}
         <div className="flex items-center gap-2 ml-auto">
           {currentView === 'home' && (
-            <div className="w-[180px] sm:w-[240px] relative">
+            <div className="w-[150px] sm:w-[220px] relative">
               <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
@@ -85,6 +91,23 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
               )}
             </div>
+          )}
+
+          {/* User Account Button (Login / Profile) */}
+          {onOpenAuth && (
+            <button
+              type="button"
+              onClick={() => onOpenAuth(currentUser ? 'login' : 'login')}
+              className="px-2.5 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60 transition flex items-center gap-1.5 text-xs font-bold shrink-0 cursor-pointer shadow-2xs"
+              title={currentUser ? `Logged in: ${currentUser.fullName || currentUser.phoneNumber}` : 'Login / Create Account'}
+            >
+              <div className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-black">
+                {currentUser ? (currentUser.fullName?.[0] || currentUser.phoneNumber?.slice(-1) || 'U') : '👤'}
+              </div>
+              <span className="hidden sm:inline max-w-[100px] truncate">
+                {currentUser ? (currentUser.fullName || currentUser.phoneNumber) : 'Login'}
+              </span>
+            </button>
           )}
         </div>
       </div>

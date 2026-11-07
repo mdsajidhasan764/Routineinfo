@@ -45,7 +45,8 @@ fun HomeScreen(
     onOpenDetails: (RoutineEntity) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenNotifications: () -> Unit,
-    onOpenBtebHub: () -> Unit
+    onOpenBtebHub: () -> Unit,
+    onOpenTeacherList: () -> Unit
 ) {
     val routines by viewModel.routines.collectAsState()
     val liveStatus by viewModel.liveStatus.collectAsState()
@@ -114,6 +115,9 @@ fun HomeScreen(
                             imageVector = if (isSearchExpanded) Icons.Default.Close else Icons.Default.Search,
                             contentDescription = "Search"
                         )
+                    }
+                    IconButton(onClick = onOpenTeacherList) {
+                        Icon(Icons.Default.Person, contentDescription = "Teacher List")
                     }
                     IconButton(onClick = onOpenNotifications) {
                         Icon(Icons.Default.Notifications, contentDescription = "Notifications")

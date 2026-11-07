@@ -32,6 +32,7 @@ import { ManageRoutinesModal } from './components/ManageRoutinesModal';
 import { DepartmentBackground } from './components/DepartmentBackground';
 import { BiometricAuthModal } from './components/BiometricAuthModal';
 import { Toast, ToastMessage } from './components/Toast';
+import { TeacherListView } from './components/TeacherListView';
 import {
   getCurrentUser,
   logoutUser,
@@ -43,8 +44,8 @@ export default function App() {
   const [state, setState] = useState<AppState>(() => loadAppState());
   const [selectedDay, setSelectedDay] = useState<DayOfWeek>(() => getCurrentDayName(loadAppState().shift));
 
-  // Current Active App Screen/View: 'home' | 'bteb' | 'settings'
-  const [currentView, setCurrentView] = useState<'home' | 'bteb' | 'settings'>('home');
+  // Current Active App Screen/View: 'home' | 'bteb' | 'settings' | 'teachers'
+  const [currentView, setCurrentView] = useState<'home' | 'bteb' | 'settings' | 'teachers'>('home');
 
   // Logged-in User Account State (Phone & Biometric)
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => getCurrentUser());
@@ -158,6 +159,11 @@ export default function App() {
 
   // Auto-request push notification permission on first app entry
   useEffect(() => {
+    // @ts-ignore
+    window.__onOpenTeacherList = () => {
+      setCurrentView('teachers' as any);
+    };
+
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       requestNotificationPermission().then((perm) => {
         if (perm === 'granted') {
@@ -407,6 +413,8 @@ export default function App() {
           onSearchChange={setSearchQuery}
           currentView={currentView}
           onNavigateHome={() => setCurrentView('home')}
+          currentUser={currentUser}
+          onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode: mode || 'login' })}
         />
 
         {/* When in Home View: Fixed Live Status Bar & Day Selector Tabs */}
@@ -474,6 +482,7 @@ export default function App() {
         }
         onOpenManageRoutines={() => setManageModalOpen(true)}
         onOpenBtebHub={() => setCurrentView('bteb')}
+        onOpenTeacherList={() => setCurrentView('teachers')}
         onOpenSettings={() => setCurrentView('settings')}
         onOpenNotifications={() => {
           setNotificationHistory(getNotificationHistory());
@@ -527,6 +536,11 @@ export default function App() {
             onOpenAuth={(mode) => setAuthModal({ isOpen: true, mode: mode || 'login' })}
             onLogout={handleLogout}
           />
+        )}
+
+        {/* Integrated Teacher Directory View */}
+        {currentView === ('teachers' as any) && (
+          <TeacherListView onBackToHome={() => setCurrentView('home')} />
         )}
       </main>
 

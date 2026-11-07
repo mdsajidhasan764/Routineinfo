@@ -1,6 +1,7 @@
 package com.bteb.routineinfo
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
@@ -44,6 +45,22 @@ class MainActivity : AppCompatActivity() {
             var isSettingsOpen by remember { mutableStateOf(false) }
             var isNotificationsOpen by remember { mutableStateOf(false) }
             var isBtebHubOpen by remember { mutableStateOf(false) }
+            var isTeacherListOpen by remember { mutableStateOf(false) }
+
+            // Android Security Flag (FLAG_SECURE): blocks screenshot & screen record for Teacher List
+            DisposableEffect(isTeacherListOpen) {
+                if (isTeacherListOpen) {
+                    window.setFlags(
+                        WindowManager.LayoutParams.FLAG_SECURE,
+                        WindowManager.LayoutParams.FLAG_SECURE
+                    )
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+                onDispose {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+                }
+            }
 
             // Handle notification routine click
             LaunchedEffect(notificationRoutineId, routines) {
@@ -75,7 +92,8 @@ class MainActivity : AppCompatActivity() {
                         },
                         onOpenSettings = { isSettingsOpen = true },
                         onOpenNotifications = { isNotificationsOpen = true },
-                        onOpenBtebHub = { isBtebHubOpen = true }
+                        onOpenBtebHub = { isBtebHubOpen = true },
+                        onOpenTeacherList = { isTeacherListOpen = true }
                     )
 
                     if (isAddEditOpen) {
@@ -134,6 +152,12 @@ class MainActivity : AppCompatActivity() {
                                 )
                                 isAddEditOpen = true
                             }
+                        )
+                    }
+
+                    if (isTeacherListOpen) {
+                        TeacherListDialog(
+                            onDismiss = { isTeacherListOpen = false }
                         )
                     }
                 }

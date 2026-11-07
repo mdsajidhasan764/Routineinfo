@@ -11,17 +11,19 @@ import {
   User,
   Edit3,
   Home,
+  Users,
 } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface LeftMenuProps {
   isOpen: boolean;
   onClose: () => void;
-  currentView?: 'home' | 'bteb' | 'settings';
+  currentView?: 'home' | 'bteb' | 'settings' | 'teachers';
   onNavigateHome?: () => void;
   onOpenAddClass: () => void;
   onOpenManageRoutines?: () => void;
   onOpenBtebHub: () => void;
+  onOpenTeacherList?: () => void;
   onOpenSettings: () => void;
   onOpenNotifications: () => void;
   currentUser?: any;
@@ -37,6 +39,7 @@ export const LeftMenu: React.FC<LeftMenuProps> = ({
   onOpenAddClass,
   onOpenManageRoutines,
   onOpenBtebHub,
+  onOpenTeacherList,
   onOpenSettings,
   onOpenNotifications,
   currentUser,
@@ -151,6 +154,29 @@ export const LeftMenu: React.FC<LeftMenuProps> = ({
                 <BookOpen className="w-4 h-4" />
               </div>
               <span>BTEB Book List</span>
+            </button>
+
+            {/* Teacher List (Jashore Polytechnic) */}
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                if (onOpenTeacherList) {
+                  onOpenTeacherList();
+                } else if ((window as any).__onOpenTeacherList) {
+                  (window as any).__onOpenTeacherList();
+                }
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl font-medium transition text-xs sm:text-sm cursor-pointer ${
+                currentView === 'teachers'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold border border-emerald-200/60 dark:border-emerald-700/50 dark:backdrop-blur-md'
+                  : 'text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100/80 dark:hover:bg-white/[0.06] hover:dark:text-white'
+              }`}
+            >
+              <div className="w-8 h-8 rounded-xl bg-teal-50 dark:bg-white/[0.06] text-teal-600 dark:text-teal-400 flex items-center justify-center shrink-0">
+                <Users className="w-4 h-4" />
+              </div>
+              <span>Teacher List</span>
             </button>
 
             {/* Manage Routines (Edit & Delete) */}
